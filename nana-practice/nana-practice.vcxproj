@@ -71,8 +71,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\lib\nana\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\lib\nana\build\bin\vc2015;C:\lib\nana\extrlib\vc2015;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\lib\nana\include;C:\lib\boost\boost_1_63_0;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\lib\nana\build\bin\vc2015;C:\lib\nana\extrlib\vc2015;C:\lib\boost\boost_1_63_0\lib32-msvc-14.0;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -91,7 +91,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0501;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
@@ -160,6 +160,7 @@
     <ClCompile Include="MainWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Config.hpp" />
     <ClInclude Include="MainWindow.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -26,5 +26,8 @@
     <ClInclude Include="MainWindow.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Config.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
