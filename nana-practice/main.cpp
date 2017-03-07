@@ -1,19 +1,10 @@
-﻿#include <array>
-#include <iostream>
-#include <memory>
-
-#include <nana/gui.hpp>
-#include <nana/gui/widgets/label.hpp>
-#include <nana/gui/widgets/button.hpp>
-#include <nana/gui/msgbox.hpp>
-
-
+﻿#include "MainWindow.hpp"
 
 int main()
 {
-	nana::form fm;
+	MainWindow window;
 
-
+	window.show();
 
 	nana::exec();
 
