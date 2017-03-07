@@ -1,9 +1,5 @@
 ﻿#pragma once
 
-#include <array>
-#include <iostream>
-#include <memory>
-
 #include <nana/gui.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>

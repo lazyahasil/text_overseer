@@ -1,6 +1,8 @@
 ﻿#include "MainWindow.hpp"
 #include "Config.hpp"
 
+#include <string>
+
 using namespace nana;
 
 MainWindow::MainWindow()
