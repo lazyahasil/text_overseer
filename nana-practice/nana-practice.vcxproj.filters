@@ -18,21 +18,21 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="MainWindow.cpp">
+    <ClCompile Include="file_handler.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="FileHandler.cpp">
+    <ClCompile Include="main_window.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MainWindow.hpp">
+    <ClInclude Include="config.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Config.hpp">
+    <ClInclude Include="file_handler.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="FileHandler.hpp">
+    <ClInclude Include="main_window.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

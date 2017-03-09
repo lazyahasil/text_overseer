@@ -4,7 +4,7 @@
 #include <utility> // std::pair
 #include <vector>
 
-namespace FileHandler
+namespace file_handler
 {
 	// @param filename: file name to search files match it
 	// @param dir_path: directory path to start a search
@@ -29,4 +29,4 @@ namespace FileHandler
 		const std::wstring& output_filename,
 		const std::wstring& dir_path
 	);
-};
+}

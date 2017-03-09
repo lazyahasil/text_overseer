@@ -1,5 +1,5 @@
-﻿#include "MainWindow.hpp"
-#include "Config.hpp"
+﻿#include "main_window.hpp"
+#include "config.hpp"
 
 #include <string>
 

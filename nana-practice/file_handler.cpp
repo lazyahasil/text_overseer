@@ -1,10 +1,10 @@
-﻿#include "FileHandler.hpp"
+﻿#include "file_handler.hpp"
 
 #include <boost/filesystem.hpp>
 
 namespace filesys = boost::filesystem;
 
-namespace FileHandler
+namespace file_handler
 {
 	template <class MutableContainerForWstring>
 	void search_files(
