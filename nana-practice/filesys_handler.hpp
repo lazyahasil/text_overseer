@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <boost/system/error_code.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <chrono>
 #include <string>
@@ -107,8 +108,8 @@ namespace filesys_handler
 	};
 
 	const TimePeriodStrings<std::string> k_time_period_strings_default{
-		"just a few", " millisecond", " milliseconds", " second", " seconds",
-		" minute", " minutes", " hour", " hours", " day", " days"
+		"just a few", " millisecond ", " milliseconds ", " second ", " seconds ",
+		" minute ", " minutes ", " hour ", " hours ", " day ", " days "
 	};
 
 	template <class StringType, class Rep, class Period>
@@ -125,17 +126,17 @@ namespace filesys_handler
 		auto do_return_just = false;
 		if (counted == 0)
 			do_return_just = true;
-		
-		if (std::ratio_less_equal<Period, std::milli>())
-			base_period = PeriodEnum::msecs;
-		else if (std::ratio_less_equal<Period, std::ratio<1>>())
-			base_period = PeriodEnum::secs;
-		else if (std::ratio_less_equal<Period, std::ratio<60>>())
-			base_period = PeriodEnum::mins;
-		else if (std::ratio_less_equal<Period, std::ratio<3600>>())
-			base_period = PeriodEnum::hours;
-		else
+
+		if (std::ratio_greater_equal<Period, std::ratio<3600>>())
 			base_period = PeriodEnum::days;
+		else if (std::ratio_greater_equal<Period, std::ratio<3600>>())
+			base_period = PeriodEnum::hours;
+		else if (std::ratio_greater_equal<Period, std::ratio<60>>())
+			base_period = PeriodEnum::mins;
+		else if (std::ratio_greater_equal<Period, std::ratio<1>>())
+			base_period = PeriodEnum::secs;
+		else
+			base_period = PeriodEnum::msecs;
 
 		const auto msecs = counted % 1000;
 		counted /= 1000;
@@ -191,25 +192,25 @@ namespace filesys_handler
 				+ (days != 1 ? periods.days_plural : periods.days_singular);
 			did_eariler = true;
 		}
-		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::hours && hours >= 1)
+		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::days && hours >= 1)
 		{
 			str += boost::lexical_cast<StringType>(hours)
 				+ (hours != 1 ? periods.hours_plural : periods.hours_singular);
 			did_eariler = true;
 		}
-		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::mins && mins >= 1)
+		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::hours && mins >= 1)
 		{
 			str += boost::lexical_cast<StringType>(mins)
 				+ (mins != 1 ? periods.mins_plural : periods.mins_singular);
 			did_eariler = true;
 		}
-		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::secs && secs >= 1)
+		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::mins && secs >= 1)
 		{
 			str += boost::lexical_cast<StringType>(secs)
 				+ (secs != 1 ? periods.secs_plural : periods.secs_singular);
 			did_eariler = true;
 		}
-		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::msecs && msecs >= 1)
+		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::secs && msecs >= 1)
 		{
 			str += boost::lexical_cast<StringType>(msecs)
 				+ (msecs != 1 ? periods.msecs_plural : periods.msecs_singular);
