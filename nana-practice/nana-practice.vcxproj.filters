@@ -24,6 +24,9 @@
     <ClCompile Include="filesys_handler.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="tap_page_io_text.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.hpp">
@@ -33,6 +36,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="filesys_handler.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="tap_page_io_text.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

@@ -35,8 +35,8 @@ namespace filesys_handler
 
 	// @param filename: file name to search files match it
 	// @param dir_path: directory path to start a search
-	// @param initialized_buf: template container with std::wstring;
-	//        it should have push_back(), and shall be empty before call this func
+	// @param initialized_buf: empty(initialized) mutable container consist of std::wstring;
+	//        it is to be used by .insert(), and shall be empty before call this func
 	// @param ecs_with_path: buffer for error codes with files' path string
 	// @param do_search_subfolders: boolean switch whether to search subfolders or not;
 	//        a default value is false
@@ -61,14 +61,12 @@ namespace filesys_handler
 		{
 			ec.clear();
 			if (filesys::is_regular_file(x.path(), ec) && x.path().filename() == filename)
-				initialized_buf.push_back(x.path().wstring());
+				initialized_buf.insert(std::end(initialized_buf), x.path().wstring());
 			else if (do_search_subfolders && filesys::is_directory(x.path(), ec))
 				// search on the subfolders
 				search_files(filename, x.path().wstring(), initialized_buf, ecs_with_path, true);
 			if (ec)
-			{
 				ecs_with_path.emplace_back(x.path().wstring(), ec);
-			}
 		}
 	}
 
@@ -91,43 +89,49 @@ namespace filesys_handler
 		boost::system::error_code&	ec
 	) noexcept;
 
-	template <class StringType>
+	template <class StringT>
 	struct TimePeriodStrings
 	{
-		StringType just;
-		StringType msecs_singular;
-		StringType msecs_plural;
-		StringType secs_singular;
-		StringType secs_plural;
-		StringType mins_singular;
-		StringType mins_plural;
-		StringType hours_singular;
-		StringType hours_plural;
-		StringType days_singular;
-		StringType days_plural;
+		StringT just;
+		StringT msecs_singular;
+		StringT msecs_plural;
+		StringT secs_singular;
+		StringT secs_plural;
+		StringT mins_singular;
+		StringT mins_plural;
+		StringT hours_singular;
+		StringT hours_plural;
+		StringT days_singular;
+		StringT days_plural;
 	};
 
-	const TimePeriodStrings<std::string> k_time_period_strings_default{
-		"just a few", " millisecond ", " milliseconds ", " second ", " seconds ",
-		" minute ", " minutes ", " hour ", " hours ", " day ", " days "
-	};
+	namespace time_period_strings
+	{
+		const TimePeriodStrings<char*> k_english{
+			"just a few", " ms ", " ms ", " second ", " seconds ",
+			" minute ", " minutes ", " hour ", " hours ", " day ", " days "
+		};
+		const TimePeriodStrings<char*> k_korean_u8{
+			u8"몇", " ms ", " ms ", u8" 초 ", u8" 초 ",
+			u8" 분 ", u8" 분 ", u8" 시간 ", u8" 시간 ", u8" 일 ", u8" 일 "
+		};
+	}
 
-	template <class StringType, class Rep, class Period>
-	StringType time_duration_to_string(
-		const	std::chrono::duration<Rep, Period>& duration,
-		bool	do_cut_smaller_periods,
-		const	TimePeriodStrings<StringType>& periods
+	template <class StringT, class PeriodStringT, class Rep, class Period>
+	StringT time_duration_to_string(
+		const std::chrono::duration<Rep, Period>&	duration,
+		bool										do_cut_smaller_periods,
+		const TimePeriodStrings<PeriodStringT>&		periods
 	)
 	{
 		enum class PeriodEnum { msecs, secs, mins, hours, days } base_period;
-
 		auto counted = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
 		auto do_return_just = false;
 		if (counted == 0)
 			do_return_just = true;
 
-		if (std::ratio_greater_equal<Period, std::ratio<3600>>())
+		if (std::ratio_greater_equal<Period, std::ratio<86400>>())
 			base_period = PeriodEnum::days;
 		else if (std::ratio_greater_equal<Period, std::ratio<3600>>())
 			base_period = PeriodEnum::hours;
@@ -149,7 +153,7 @@ namespace filesys_handler
 		const auto days = counted;
 
 		// check if the duration is smaller than a base period
-		const StringType* period = nullptr;
+		const PeriodStringT* period = nullptr;
 		if ((do_return_just || msecs == 0) && base_period == PeriodEnum::msecs)
 		{
 			period = &periods.msecs_singular;
@@ -176,7 +180,7 @@ namespace filesys_handler
 			do_return_just = true;
 		}
 
-		StringType str;
+		StringT str;
 
 		if (do_return_just) // return just a moment
 		{
@@ -188,35 +192,60 @@ namespace filesys_handler
 
 		if (days >= 1)
 		{
-			str = boost::lexical_cast<StringType>(days)
+			str = boost::lexical_cast<StringT>(days)
 				+ (days != 1 ? periods.days_plural : periods.days_singular);
 			did_eariler = true;
 		}
 		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::days && hours >= 1)
 		{
-			str += boost::lexical_cast<StringType>(hours)
+			str += boost::lexical_cast<StringT>(hours)
 				+ (hours != 1 ? periods.hours_plural : periods.hours_singular);
 			did_eariler = true;
 		}
 		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::hours && mins >= 1)
 		{
-			str += boost::lexical_cast<StringType>(mins)
+			str += boost::lexical_cast<StringT>(mins)
 				+ (mins != 1 ? periods.mins_plural : periods.mins_singular);
 			did_eariler = true;
 		}
 		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::mins && secs >= 1)
 		{
-			str += boost::lexical_cast<StringType>(secs)
+			str += boost::lexical_cast<StringT>(secs)
 				+ (secs != 1 ? periods.secs_plural : periods.secs_singular);
 			did_eariler = true;
 		}
 		if ((!do_cut_smaller_periods || !did_eariler) && base_period <= PeriodEnum::secs && msecs >= 1)
 		{
-			str += boost::lexical_cast<StringType>(msecs)
+			str += boost::lexical_cast<StringT>(msecs)
 				+ (msecs != 1 ? periods.msecs_plural : periods.msecs_singular);
 			did_eariler = true;
 		}
 
 		return str;
+	}
+
+	template <class StringT, class Rep, class Period>
+	StringT time_duration_to_string(
+		const std::chrono::duration<Rep, Period>&	duration,
+		bool										do_cut_smaller_periods,
+		const TimePeriodStrings<StringT>&			periods
+	)
+	{
+		return time_duration_to_string<StringT>(duration, do_cut_smaller_periods, periods);
+	}
+
+	// a function template of time_duration_to_string for the pointer character types
+	// it is called if TimePeriodStrings equals CharT* and StringT equals std::basic_string<CharT>.
+	template <class StringT, class CharT, class Rep, class Period,
+		typename std::enable_if_t<
+		std::is_same< StringT, std::basic_string<CharT> >::value >
+	>
+	StringT time_duration_to_string(
+		const std::chrono::duration<Rep, Period>&	duration,
+		bool										do_cut_smaller_periods,
+		const TimePeriodStrings<CharT*>&			periods
+	)
+	{
+		return time_duration_to_string<StringT>(duration, do_cut_smaller_periods, periods);
 	}
 }
