@@ -184,7 +184,8 @@ namespace filesys_handler
 
 		if (do_return_just) // return just a moment
 		{
-			str = periods.just + *period;
+			str = periods.just;
+			str += *period;
 			return str;
 		}
 
@@ -224,28 +225,15 @@ namespace filesys_handler
 		return str;
 	}
 
-	template <class StringT, class Rep, class Period>
-	StringT time_duration_to_string(
-		const std::chrono::duration<Rep, Period>&	duration,
-		bool										do_cut_smaller_periods,
-		const TimePeriodStrings<StringT>&			periods
-	)
-	{
-		return time_duration_to_string<StringT>(duration, do_cut_smaller_periods, periods);
-	}
-
 	// a function template of time_duration_to_string for the pointer character types
 	// it is called if TimePeriodStrings equals CharT* and StringT equals std::basic_string<CharT>.
-	template <class StringT, class CharT, class Rep, class Period,
-		typename std::enable_if_t<
-		std::is_same< StringT, std::basic_string<CharT> >::value >
-	>
-	StringT time_duration_to_string(
+	template <class CharT, class Rep, class Period>
+	decltype(auto) time_duration_to_string(
 		const std::chrono::duration<Rep, Period>&	duration,
 		bool										do_cut_smaller_periods,
 		const TimePeriodStrings<CharT*>&			periods
 	)
 	{
-		return time_duration_to_string<StringT>(duration, do_cut_smaller_periods, periods);
+		return time_duration_to_string<std::basic_string<CharT>>(duration, do_cut_smaller_periods, periods);
 	}
 }
