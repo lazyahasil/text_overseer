@@ -18,10 +18,10 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="file_handler.cpp">
+    <ClCompile Include="main_window.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="main_window.cpp">
+    <ClCompile Include="filesys_handler.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,10 +29,10 @@
     <ClInclude Include="config.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="file_handler.hpp">
+    <ClInclude Include="main_window.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="main_window.hpp">
+    <ClInclude Include="filesys_handler.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

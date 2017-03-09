@@ -156,13 +156,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="file_handler.cpp" />
+    <ClCompile Include="filesys_handler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="main_window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.hpp" />
-    <ClInclude Include="file_handler.hpp" />
+    <ClInclude Include="filesys_handler.hpp" />
     <ClInclude Include="main_window.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
