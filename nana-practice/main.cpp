@@ -1,4 +1,4 @@
-﻿#include "main_window.hpp"
+﻿#include "gui.hpp"
 
 int main()
 {

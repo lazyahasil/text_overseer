@@ -156,16 +156,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="filesys_handler.cpp" />
+    <ClCompile Include="file_system.cpp" />
+    <ClCompile Include="io_text_file.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="main_window.cpp" />
-    <ClCompile Include="tap_page_io_text.cpp" />
+    <ClCompile Include="gui.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="config.hpp" />
-    <ClInclude Include="filesys_handler.hpp" />
-    <ClInclude Include="main_window.hpp" />
-    <ClInclude Include="tap_page_io_text.hpp" />
+    <ClInclude Include="file_system.hpp" />
+    <ClInclude Include="gui.hpp" />
+    <ClInclude Include="io_text_file.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

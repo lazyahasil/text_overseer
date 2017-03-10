@@ -18,27 +18,24 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="main_window.cpp">
+    <ClCompile Include="io_text_file.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="filesys_handler.cpp">
+    <ClCompile Include="gui.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="tap_page_io_text.cpp">
+    <ClCompile Include="file_system.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="config.hpp">
+    <ClInclude Include="io_text_file.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="main_window.hpp">
+    <ClInclude Include="gui.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="filesys_handler.hpp">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="tap_page_io_text.hpp">
+    <ClInclude Include="file_system.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

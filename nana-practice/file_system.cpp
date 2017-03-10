@@ -1,11 +1,18 @@
-﻿#include "filesys_handler.hpp"
+﻿#include "file_system.hpp"
 
 #include <boost/filesystem.hpp>
 
-namespace filesys = boost::filesystem;
-
-namespace filesys_handler
+namespace file_system
 {
+	TimePointOfSys file_last_write_time(
+		const std::wstring&			file_path,
+		boost::system::error_code&	ec
+	) noexcept
+	{
+		std::time_t time = filesys::last_write_time(filesys::path(file_path), ec);
+		return std::chrono::system_clock::from_time_t(time); // from_time_t(): noexcept
+	}
+
 	std::pair<std::vector<IOFilePathPair>, std::vector<FilePathErrorCode>>
 		search_input_output_files(
 			const std::wstring& input_filename,
@@ -36,14 +43,5 @@ namespace filesys_handler
 		}
 
 		return std::make_pair(io_files, ecs);
-	}
-
-	std::chrono::time_point<std::chrono::system_clock> file_last_write_time(
-		const std::wstring&			file_path,
-		boost::system::error_code&	ec
-	) noexcept
-	{
-		std::time_t time = filesys::last_write_time(filesys::path(file_path), ec);
-		return std::chrono::system_clock::from_time_t(time); // from_time_t(): noexcept
 	}
 }

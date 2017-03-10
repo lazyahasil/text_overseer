@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <boost/system/error_code.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <chrono>
@@ -8,8 +7,10 @@
 #include <utility> // std::pair
 #include <vector>
 
-namespace filesys_handler
+namespace file_system
 {
+	namespace filesys = boost::filesystem;
+
 	class FilePathErrorCode
 	{
 	public:
@@ -19,19 +20,21 @@ namespace filesys_handler
 		FilePathErrorCode(std::wstring&& path_str, boost::system::error_code ec)
 			: path_str_(move(path_str)), ec_(ec) { }
 
-		auto path_str() const noexcept
-		{
-			return path_str_;
-		}
-		auto error_code() const noexcept
-		{
-			return ec_;
-		}
+		auto path_str() const noexcept { return path_str_; }
+		auto error_code() const noexcept { return ec_; }
 
 	private:
 		std::wstring path_str_;
 		boost::system::error_code ec_;
 	};
+
+	using TimePointOfSys = std::chrono::time_point<std::chrono::system_clock>;
+
+	// @param file_path: 
+	TimePointOfSys file_last_write_time(
+		const std::wstring&			file_path,
+		boost::system::error_code&	ec
+	) noexcept;
 
 	// @param filename: file name to search files match it
 	// @param dir_path: directory path to start a search
@@ -83,30 +86,25 @@ namespace filesys_handler
 			const std::wstring& dir_path
 		) noexcept;
 
-	// @param file_path: 
-	std::chrono::time_point<std::chrono::system_clock> file_last_write_time(
-		const std::wstring&			file_path,
-		boost::system::error_code&	ec
-	) noexcept;
-
-	template <class StringT>
-	struct TimePeriodStrings
-	{
-		StringT just;
-		StringT msecs_singular;
-		StringT msecs_plural;
-		StringT secs_singular;
-		StringT secs_plural;
-		StringT mins_singular;
-		StringT mins_plural;
-		StringT hours_singular;
-		StringT hours_plural;
-		StringT days_singular;
-		StringT days_plural;
-	};
-
 	namespace time_period_strings
 	{
+		template <class StringT>
+		struct TimePeriodStrings
+		{
+			// Most of strings, which mean a period, have blanks at both sides
+			StringT just_a_few;		// has no blank
+			StringT msecs_singular;
+			StringT msecs_plural;
+			StringT secs_singular;
+			StringT secs_plural;
+			StringT mins_singular;
+			StringT mins_plural;
+			StringT hours_singular;
+			StringT hours_plural;
+			StringT days_singular;
+			StringT days_plural;
+		};
+
 		const TimePeriodStrings<char*> k_english{
 			"just a few", " ms ", " ms ", " second ", " seconds ",
 			" minute ", " minutes ", " hour ", " hours ", " day ", " days "
@@ -116,6 +114,9 @@ namespace filesys_handler
 			u8" 분 ", u8" 분 ", u8" 시간 ", u8" 시간 ", u8" 일 ", u8" 일 "
 		};
 	}
+
+	template <class T>
+	using TimePeriodStrings = time_period_strings::TimePeriodStrings<T>;
 
 	template <class StringT, class PeriodStringT, class Rep, class Period>
 	StringT time_duration_to_string(
@@ -127,7 +128,7 @@ namespace filesys_handler
 		enum class PeriodEnum { msecs, secs, mins, hours, days } base_period;
 		auto counted = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 
-		auto do_return_just = false;
+		auto do_return_just = false; // return "just ~ " if true
 		if (counted == 0)
 			do_return_just = true;
 
@@ -152,39 +153,40 @@ namespace filesys_handler
 		counted /= 24;
 		const auto days = counted;
 
-		// check if the duration is smaller than a base period
+		// a pointer to the period string
 		const PeriodStringT* period = nullptr;
+		// check if the duration is smaller than a base period
 		if ((do_return_just || msecs == 0) && base_period == PeriodEnum::msecs)
 		{
-			period = &periods.msecs_singular;
+			period = &periods.msecs_plural;
 			do_return_just = true;
 		}
 		else if ((do_return_just || secs == 0) && base_period == PeriodEnum::secs)
 		{
-			period = &periods.secs_singular;
+			period = &periods.secs_plural;
 			do_return_just = true;
 		}
 		else if ((do_return_just || mins == 0) && base_period == PeriodEnum::mins)
 		{
-			period = &periods.mins_singular;
+			period = &periods.mins_plural;
 			do_return_just = true;
 		}
 		else if ((do_return_just || hours == 0) && base_period == PeriodEnum::hours)
 		{
-			period = &periods.hours_singular;
+			period = &periods.hours_plural;
 			do_return_just = true;
 		}
 		else if ((do_return_just || days == 0) && base_period == PeriodEnum::days)
 		{
-			period = &periods.days_singular;
+			period = &periods.days_plural;
 			do_return_just = true;
 		}
 
 		StringT str;
 
-		if (do_return_just) // return just a moment
+		if (do_return_just) // return just a few period(for example: second)
 		{
-			str = periods.just;
+			str = periods.just_a_few;
 			str += *period;
 			return str;
 		}
