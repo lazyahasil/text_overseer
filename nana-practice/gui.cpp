@@ -5,9 +5,9 @@ using namespace nana;
 TextBoxUnit::TextBoxUnit(window wd) : AbstractBoxUnit(wd)
 {
 	place_.div(R"(<vert
-				    <weight=30 <lab_name> >
-				    <weight=80% <textbox>>
-				    <weight=20 <lab_state>>
+				    <weight=30 lab_name>
+				    <textbox>
+				    <weight=20 lab_state>
 				  >)");
 	place_["lab_name"] << lab_name_;
 	place_["textbox"] << textbox_;
@@ -16,7 +16,10 @@ TextBoxUnit::TextBoxUnit(window wd) : AbstractBoxUnit(wd)
 	lab_name_.caption(u8"<size=11>문제에서 제시한 출력</>");
 	lab_name_.format(true);
 	lab_name_.text_align(align::center, align_v::center);
+
 	lab_state_.caption(u8"상태");
+	lab_name_.format(true);
+	lab_name_.text_align(align::left, align_v::center);
 }
 
 bool TextBoxUnit::update_label_state()
@@ -49,11 +52,47 @@ bool AbstractIOFileBoxUnit::check_last_write_time(boost::system::error_code & ec
 	return false;
 }
 
+InputFileBoxUnit::InputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
+{
+	place_.div(R"(<vert
+				    <weight=30 lab_name>
+				    <textbox>
+				    < weight=20 <lab_state> <but_save> >
+				  >)");
+	place_["lab_name"] << lab_name_;
+	place_["textbox"] << textbox_;
+	place_["lab_state"] << lab_state_;
+	place_["but_save"] << but_save_;
+
+	lab_name_.caption(u8"<size=11>문제에서 제시한 출력</>");
+	lab_name_.format(true);
+	lab_name_.text_align(align::center, align_v::center);
+
+	lab_state_.caption(u8"상태");
+	lab_name_.format(true);
+	lab_name_.text_align(align::left, align_v::center);
+
+	but_save_.caption(u8"저장");
+
+	// test
+	text_file_.set_filename(L"input2.txt");
+	text_file_.open(std::ios::in | std::ios::binary);
+	std::exception e;
+	std::string str = text_file_.read_all(e);
+	if (text_file_.file_locale() == file_io::LocaleEnum::system)
+		charset(str).to_bytes(unicode::utf8);
+	textbox_.caption(str);
+	text_file_.close();
+}
+
 TapPageIOText::TapPageIOText(window wd) : panel<false>(wd)
 {
-	place_.div("<margin=5 answer_result_box>");
-	place_["answer_result_box"] << answer_result_box_;
-	place_["label"] << label_;
+	place_.div(R"(<
+					<weight=5>
+					<gap=5 boxes>
+					<weight=5>
+				  >)");
+	place_["boxes"] << input_box_ << answer_result_box_;
 
 	label_.caption(
 		file_system::time_duration_to_string(
@@ -73,7 +112,11 @@ MainWindow::MainWindow() : form(API::make_center(600, 400), appear::decorate<app
 	place_["lab_status"] << lab_status_;
 	place_["label"] << lab_;
 
-	init_tap_pages();
+	// initiation of tap pages
+	place_["tab"] << tabbar_;
+	place_["tab_frame"].fasten(tab_page_io_text_);
+
+	tabbar_.append(u8"테스트", tab_page_io_text_);
 
 	this->events().unload([this](const arg_unload& ei)
 	{
@@ -83,12 +126,4 @@ MainWindow::MainWindow() : form(API::make_center(600, 400), appear::decorate<app
 	});
 
 	place_.collocate();
-}
-
-void MainWindow::init_tap_pages()
-{
-	place_["tab"] << tabbar_;
-	place_["tab_frame"].fasten(tab_page_io_text_);
-
-	tabbar_.append(u8"테스트", tab_page_io_text_);
 }

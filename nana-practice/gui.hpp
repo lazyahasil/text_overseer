@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "file_system.hpp"
-#include "io_text_file.hpp"
+#include "file_io.hpp"
 
 #include <nana/gui.hpp>
 #include <nana/gui/widgets/button.hpp>
@@ -57,14 +57,14 @@ public:
 protected:
 	nana::button but_folder_{ *this };
 
-	IOTextFile text_file_;
+	file_io::IOTextFile text_file_;
 	file_system::TimePointOfSys last_write_time_;
 };
 
 class InputFileBoxUnit : public AbstractIOFileBoxUnit
 {
 public:
-	InputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd) { }
+	InputFileBoxUnit(nana::window wd);
 
 private:
 	nana::button but_save_{ *this };
@@ -87,8 +87,8 @@ public:
 private:
 	nana::place place_{ *this };
 
-	/*InputFileBoxUnit input_box_{ *this };
-	OutputFileBoxUnit output_box_{ *this };*/
+	InputFileBoxUnit input_box_{ *this };
+	//OutputFileBoxUnit output_box_{ *this };
 	TextBoxUnit answer_result_box_{ *this };
 
 	nana::label label_{ *this, u8"테스트 레이블" };
@@ -100,8 +100,6 @@ public:
 	MainWindow();
 
 private:
-	void init_tap_pages();
-
 	nana::place place_{ *this };
 	nana::label lab_status_{ *this, u8"Nana C++ Library로 만들었습니다." };
 	nana::label lab_{ *this, u8"test <bold red size=40>text</>" };

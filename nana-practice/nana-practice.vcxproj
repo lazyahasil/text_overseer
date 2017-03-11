@@ -157,14 +157,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="file_system.cpp" />
-    <ClCompile Include="io_text_file.cpp" />
+    <ClCompile Include="file_io.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="gui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="file_system.hpp" />
     <ClInclude Include="gui.hpp" />
-    <ClInclude Include="io_text_file.hpp" />
+    <ClInclude Include="file_io.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
