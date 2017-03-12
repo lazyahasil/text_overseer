@@ -5,9 +5,9 @@ using namespace nana;
 TextBoxUnit::TextBoxUnit(window wd) : AbstractBoxUnit(wd)
 {
 	place_.div(R"(<vert
-				    <weight=30 lab_name>
+				    <weight=25 margin=[0,0,3,0] lab_name>
 				    <textbox>
-				    <weight=20 lab_state>
+				    <weight=50 margin=[3,0,0,0] lab_state>
 				  >)");
 	place_["lab_name"] << lab_name_;
 	place_["textbox"] << textbox_;
@@ -55,44 +55,69 @@ bool AbstractIOFileBoxUnit::check_last_write_time(boost::system::error_code & ec
 InputFileBoxUnit::InputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
 {
 	place_.div(R"(<vert
-				    <weight=30 lab_name>
+				    <weight=25 margin=[0,0,3,0]
+					  <lab_name>
+					  <weight=25 btn_folder>
+					>
 				    <textbox>
-				    < weight=20 <lab_state> <but_save> >
+				    <weight=50 margin=[3,0,0,0]
+					  <lab_state>
+					  <weight=80 btn_save>
+					>
 				  >)");
 	place_["lab_name"] << lab_name_;
+	place_["btn_folder"] << btn_folder_;
 	place_["textbox"] << textbox_;
 	place_["lab_state"] << lab_state_;
-	place_["but_save"] << but_save_;
+	place_["btn_save"] << btn_save_;
 
-	lab_name_.caption(u8"<size=11>문제에서 제시한 출력</>");
+	lab_name_.caption(u8"<size=11><bold>input</>.txt</>");
 	lab_name_.format(true);
 	lab_name_.text_align(align::center, align_v::center);
 
 	lab_state_.caption(u8"상태");
 	lab_name_.format(true);
 	lab_name_.text_align(align::left, align_v::center);
+}
 
-	but_save_.caption(u8"저장");
+OutputFileBoxUnit::OutputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
+{
+	place_.div(R"(<vert
+				    <weight=25 margin=[0,0,3,0]
+					  <lab_name>
+					  <weight=25 btn_folder>
+					>
+				    <textbox>
+				    <weight=50 margin=[3,0,0,0] lab_state>
+				  >)");
+	place_["lab_name"] << lab_name_;
+	place_["btn_folder"] << btn_folder_;
+	place_["textbox"] << textbox_;
+	place_["lab_state"] << lab_state_;
 
-	// test
-	text_file_.set_filename(L"input2.txt");
-	text_file_.open(std::ios::in | std::ios::binary);
-	std::exception e;
-	std::string str = text_file_.read_all(e);
-	if (text_file_.file_locale() == file_io::LocaleEnum::system)
-		charset(str).to_bytes(unicode::utf8);
-	textbox_.caption(str);
-	text_file_.close();
+	lab_name_.caption(u8"<size=11><bold>output</>.txt</>");
+	lab_name_.format(true);
+	lab_name_.text_align(align::center, align_v::center);
+
+	lab_state_.caption(u8"상태");
+	lab_name_.format(true);
+	lab_name_.text_align(align::left, align_v::center);
 }
 
 TapPageIOText::TapPageIOText(window wd) : panel<false>(wd)
 {
 	place_.div(R"(<
 					<weight=5>
-					<gap=5 boxes>
+					<
+					  <input_box>
+					  | <output_box>
+					  | <weight=25% answer_box>
+					>
 					<weight=5>
 				  >)");
-	place_["boxes"] << input_box_ << answer_result_box_;
+	place_["input_box"] << input_box_;
+	place_["output_box"] << output_box_;
+	place_["answer_box"] << answer_result_box_;
 
 	label_.caption(
 		file_system::time_duration_to_string(
@@ -100,30 +125,36 @@ TapPageIOText::TapPageIOText(window wd) : panel<false>(wd)
 	);
 }
 
-MainWindow::MainWindow() : form(API::make_center(600, 400), appear::decorate<appear::sizable>())
+MainWindow::MainWindow() : form(API::make_center(640, 400), appear::decorate<appear::sizable>())
 {
 	caption(std::string(u8"입출력 텍스트 파일 감시기 v") + VERSION_STRING);
 
-	lab_status_.format(false);
-	lab_.format(true);
-
-	place_.div("vert <weight=20 lab_status> <weight=40 label> <>"
-		"<weight=20 tab> <weight=70% tab_frame>");
-	place_["lab_status"] << lab_status_;
-	place_["label"] << lab_;
-
+	// div
+	place_.div(R"(<vert
+					<weight=60 margin=[4, 3, 10, 3]
+					  <lab_welcome>
+					  <weight=150 btn_refresh>
+					>
+					<weight=30 tab>
+					<margin=[5, 0, 3, 0] tab_frame>
+				  >)");
+	place_["lab_welcome"] << lab_welcome_;
+	place_["btn_refresh"] << btn_refresh_;
 	// initiation of tap pages
 	place_["tab"] << tabbar_;
 	place_["tab_frame"].fasten(tab_page_io_text_);
-
 	tabbar_.append(u8"테스트", tab_page_io_text_);
+	// collocate
+	place_.collocate();
 
+	// widget initiation
+	lab_welcome_.format(true);
+
+	// event
 	this->events().unload([this](const arg_unload& ei)
 	{
-		msgbox mb(*this, "Question", msgbox::yes_no);
-		mb.icon(mb.icon_question) << "Are you sure you want to exit the demo?";
+		msgbox mb(*this, u8"프로그램 종료", msgbox::yes_no);
+		mb.icon(mb.icon_question) << u8"정말로 종료하시겠습니까?";
 		ei.cancel = (mb() == mb.pick_no);
 	});
-
-	place_.collocate();
 }

@@ -1,5 +1,8 @@
 ﻿#include "file_io.hpp"
 
+#include <array>
+#include <vector>
+
 namespace file_io
 {
 	bool IOTextFile::open(std::ios::openmode mode) // needs std::ios::binary
@@ -14,7 +17,7 @@ namespace file_io
 	LocaleEnum IOTextFile::read_bom(std::exception & e)
 	{
 		std::array<unsigned char, 3> buf;
-		if (!read_file_check(e))
+		if (!_read_file_check(e))
 			return LocaleEnum::fail;
 		file_.seekg(0, std::ios::end);
 		auto file_size = file_.tellg();
@@ -44,56 +47,43 @@ namespace file_io
 		return false;
 	}
 
-	std::string IOTextFile::read_all(std::exception & e)
+	std::string IOTextFile::read_all(std::exception & e) noexcept
 	{
 		std::string buf;
-
-		try
-		{
-			std::streamoff bom_length;
-
-			if (!update_file_locale_by_read_bom(e)) // includes read_file_check()
-				return buf;
-			bom_length = file_.tellg();
-
-			// set locale codecvt
-			switch (file_locale_)
-			{
-			case LocaleEnum::system:
-			case LocaleEnum::utf8:
-				file_.seekg(0, std::ios::end);
-				buf.resize(static_cast<std::size_t>(file_.tellg() - bom_length));
-				file_.seekg(bom_length, std::ios::beg);
-				file_.read(reinterpret_cast<unsigned char*>(&buf[0]), buf.size());
-				file_.close();
-				break;
-			case LocaleEnum::utf16_le:
-				e = std::exception("UTF-16 support is not ready yet");
-				return buf;
-			}
-		}
-		catch (std::exception& _e)
-		{
-			e = _e;
-		}
-
+		read_all(buf, 0U, true, e);
 		return buf;
 	}
 
-	void IOTextFile::write_all(const char * buf)
+	std::u16string IOTextFile::read_all_u16(std::exception & e) noexcept
 	{
-
+		std::u16string buf;
+		read_all(buf, 0U, true, e);
+		return buf;
 	}
 
-	bool IOTextFile::read_file_check(std::exception & e)
+	bool IOTextFile::_read_file_check(std::exception & e)
 	{
 		auto result = false;
 		if (!file_)
 			e = std::exception("invaild file stream");
 		else if ((file_openmode_ & std::ios::in) == false)
-			e = std::exception("not input mode");
+			e = std::exception("file stream is not input mode");
 		else if ((file_openmode_ & std::ios::binary) == false)
-			e = std::exception("not binary mode");
+			e = std::exception("file stream is not binary mode");
+		else
+			result = true;
+		return result;
+	}
+
+	bool IOTextFile::_write_file_check(std::exception & e)
+	{
+		auto result = false;
+		if (!file_)
+			e = std::exception("invaild file stream");
+		else if ((file_openmode_ & std::ios::out) == false)
+			e = std::exception("file stream is not output mode");
+		else if ((file_openmode_ & std::ios::binary) == false)
+			e = std::exception("file stream is not binary mode");
 		else
 			result = true;
 		return result;
