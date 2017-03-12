@@ -38,5 +38,11 @@
     <ClInclude Include="file_io.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="error_handler.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="singleton.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

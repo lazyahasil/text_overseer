@@ -24,8 +24,8 @@ namespace file_system
 		auto error_code() const noexcept { return ec_; }
 
 	private:
-		std::wstring path_str_;
-		boost::system::error_code ec_;
+		std::wstring				path_str_;
+		boost::system::error_code	ec_;
 	};
 
 	using TimePointOfSys = std::chrono::time_point<std::chrono::system_clock>;
@@ -83,6 +83,7 @@ namespace file_system
 		search_input_output_files(
 			const std::wstring& input_filename,
 			const std::wstring& output_filename,
+			bool				do_always_create_output_path,
 			const std::wstring& dir_path
 		) noexcept;
 

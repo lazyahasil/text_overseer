@@ -3,7 +3,9 @@
 #include "file_system.hpp"
 #include "file_io.hpp"
 
+#include <mutex>
 #include <nana/gui.hpp>
+#include <nana/gui/widgets/combox.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/panel.hpp>
@@ -17,10 +19,10 @@
 class AbstractBoxUnit : public nana::panel<false>
 {
 public:
-	AbstractBoxUnit(nana::window wd) : nana::panel<false>(wd) { }
-	virtual ~AbstractBoxUnit() { }
+	AbstractBoxUnit(nana::window wd);
+	virtual ~AbstractBoxUnit() = default;
 
-	virtual bool update_label_state() = 0;
+	virtual bool update_label_state() noexcept = 0;
 
 protected:
 	nana::place place_{ *this };
@@ -34,7 +36,7 @@ class TextBoxUnit : public AbstractBoxUnit
 public:
 	TextBoxUnit(nana::window wd);
 
-	virtual bool update_label_state() override;
+	virtual bool update_label_state() noexcept override;
 
 private:
 };
@@ -42,29 +44,36 @@ private:
 class AbstractIOFileBoxUnit : public AbstractBoxUnit
 {
 public:
-	AbstractIOFileBoxUnit(nana::window wd) : AbstractBoxUnit(wd) { }
-	virtual ~AbstractIOFileBoxUnit() { }
+	AbstractIOFileBoxUnit(nana::window wd);
+	virtual ~AbstractIOFileBoxUnit() = default;
 
-	virtual bool update_label_state() override;
+	virtual bool update_label_state() noexcept override;
 
-	bool register_file(const std::wstring& file_path, boost::system::error_code& ec);
-	bool read_file(boost::system::error_code& ec);
-	bool write_file(boost::system::error_code& ec);
+	bool register_file(const std::wstring& file_path) noexcept;
+	bool read_file() noexcept;
+	virtual bool write_file() noexcept = 0;
 
-	decltype(auto) last_write_time() const { return file_system::TimePointOfSys(); }
-	bool check_last_write_time(boost::system::error_code& ec) const;
+	decltype(auto) last_write_time() const noexcept { return file_system::TimePointOfSys(); }
+	bool check_last_write_time() const noexcept;
 
 protected:
 	nana::button btn_folder_{ *this };
+	nana::combox combo_locale_{ *this, u8"파일 인코딩" };
 
-	file_io::IOTextFile text_file_;
+	FileIO file_;
+	std::mutex file_mutex_;
 	file_system::TimePointOfSys last_write_time_;
+
+private:
+	void _make_event_combo_locale() noexcept;
 };
 
 class InputFileBoxUnit : public AbstractIOFileBoxUnit
 {
 public:
 	InputFileBoxUnit(nana::window wd);
+
+	virtual bool write_file() noexcept override;
 
 private:
 	nana::button btn_save_{ *this, u8"저장" };
@@ -75,14 +84,16 @@ class OutputFileBoxUnit : public AbstractIOFileBoxUnit
 public:
 	OutputFileBoxUnit(nana::window wd);
 
+	virtual bool write_file() noexcept override { return false; }
+
 private:
 	
 };
 
-class TapPageIOText : public nana::panel<false>
+class IOTextTapPage : public nana::panel<true>
 {
 public:
-	TapPageIOText(nana::window wd);
+	IOTextTapPage(nana::window wd);
 
 private:
 	nana::place place_{ *this };
@@ -103,12 +114,11 @@ private:
 	nana::place place_{ *this };
 	nana::label lab_welcome_{
 		*this,
-		u8"<green bold size=10>Nana C++ GUI Library</>로 만들었습니다.\n"
-		u8"이 프로그램이 위치한 폴더와 하위 폴더에 있는 "
-		u8"<blue>input.txt</>와 <blue>output.txt</>의 변동 여부를 실시간으로 감지합니다."
+		u8"이 프로그램은 이 프로그램이 위치한 폴더와 하위 폴더에 있는 "
+		u8"<blue>input.txt</>와 <blue>output.txt</>의 변동 여부를 실시간으로 감지합니다.\n"
+		u8"사용한 라이브러리: <green size=10>Nana C++ GUI Library</>, <green size=10>Boost.Filesystem</>"
 	};
 	nana::button btn_refresh_{ *this, u8"입출력 파일 다시 찾기" };
 	nana::tabbar<std::string> tabbar_{ *this };
-	TapPageIOText tab_page_io_text_{ *this };
-	// std::vector<std::shared_ptr<nana::panel<false>>> tab_pages_io_text_;
+	std::vector<std::shared_ptr<nana::panel<true>>> tab_pages_;
 };
