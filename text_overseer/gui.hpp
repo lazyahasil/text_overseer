@@ -71,7 +71,7 @@ namespace text_overseer
 
 	protected:
 		bool _read_file() noexcept;
-		virtual bool _write_file() noexcept = 0;
+		virtual bool _write_file() = 0;
 
 		nana::button btn_reload_{ *this, u8"다시 읽기" };
 		nana::button btn_folder_{ *this };
@@ -101,7 +101,7 @@ namespace text_overseer
 			~DeletableFacet() {}
 		};
 
-		virtual bool _write_file() noexcept override;
+		virtual bool _write_file() override;
 
 		nana::button btn_save_{ *this, u8"저장" };
 	};

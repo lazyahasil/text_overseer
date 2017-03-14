@@ -185,7 +185,7 @@ namespace text_overseer
 	{
 		combo_locale_.events().selected([this](const nana::arg_combox& arg_combo) {
 			// update file locale
-			std::lock_guard<std::mutex> g(file_mutex_);
+			std::lock_guard<std::mutex> g(this->file_mutex_);
 			file_.locale(static_cast<FileIO::encoding>(arg_combo.widget.option()));
 		});
 	}
@@ -224,15 +224,16 @@ namespace text_overseer
 		});
 	}
 
-	bool InputFileBoxUnit::_write_file() noexcept
+	bool InputFileBoxUnit::_write_file()
 	{
-		std::lock_guard<std::mutex> g(file_mutex_);
+		file_mutex_.lock(); // must unlock before return!!
 
 		if (!file_.open(std::ios::out | std::ios::binary))
 		{
 			ErrorHdr::instance().report(
 				ErrorHdr::priority::info, 0, "can't open file to write", file_.filename()
 			);
+			file_mutex_.unlock();
 			return false;
 		}
 
@@ -264,10 +265,16 @@ namespace text_overseer
 		{
 			ErrorHdr::instance().report(ErrorHdr::priority::info, 0, e.what());
 			file_.close();
+			file_mutex_.unlock();
 			return false;
 		}
 
 		file_.close();
+		file_mutex_.unlock();
+
+		// In mutex lock situation, it will cause nana gui exception(busy device).
+		// [this program will terminate when _write_file() is noexcept!!]
+		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
 		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
 		return true;
 	}
@@ -484,7 +491,7 @@ namespace text_overseer
 			}
 			if (!are_already_in_tabs)
 			{
-				tabbar_.erase(i);
+				tabbar_.erase(i); // it will change current activated tab; but can't manage to handle this
 				io_tab_pages_.erase(io_tab_pages_.begin() + i--);
 			}
 		}
