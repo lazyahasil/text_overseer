@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nana-practice", "nana-practice\nana-practice.vcxproj", "{FC578F77-F990-4554-8CA8-1BE3AFFC2F58}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "text_overseer", "text_overseer\text_overseer.vcxproj", "{FC578F77-F990-4554-8CA8-1BE3AFFC2F58}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

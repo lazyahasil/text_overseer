@@ -2,7 +2,7 @@
 
 int main()
 {
-	MainWindow window;
+	text_overseer::MainWindow window;
 
 	window.show();
 
