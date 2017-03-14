@@ -15,7 +15,7 @@
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-#define VERSION_STRING "0.2"
+#define VERSION_STRING "0.2.1"
 
 namespace text_overseer
 {
@@ -73,6 +73,7 @@ namespace text_overseer
 		bool _read_file() noexcept;
 		virtual bool _write_file() noexcept = 0;
 
+		nana::button btn_reload_{ *this, u8"다시 읽기" };
 		nana::button btn_folder_{ *this };
 		nana::combox combo_locale_{ *this, u8"파일 인코딩" };
 
@@ -83,6 +84,7 @@ namespace text_overseer
 
 	private:
 		bool _check_last_write_time() noexcept;
+		void _make_event_btn_reload() noexcept;
 		void _make_event_combo_locale() noexcept;
 	};
 

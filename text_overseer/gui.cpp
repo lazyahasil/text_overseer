@@ -39,8 +39,12 @@ namespace text_overseer
 		combo_locale_.push_back("ANSI");
 		combo_locale_.push_back("UTF-8");
 		combo_locale_.push_back("UTF-16LE");
+		
+		// widgets
+		btn_reload_.enabled(false);
 
 		// make event
+		_make_event_btn_reload();
 		_make_event_combo_locale();
 	}
 
@@ -151,6 +155,7 @@ namespace text_overseer
 		{
 			last_write_time_ = time_gotton;
 			last_write_time_is_vaild_ = true;
+			btn_reload_.enabled(true);
 			return true;
 		}
 
@@ -160,16 +165,24 @@ namespace text_overseer
 			{
 				ErrorHdr::instance().report(ErrorHdr::priority::info, ec.value(), ec.message().c_str());
 				last_write_time_is_vaild_ = false;
+				btn_reload_.enabled(false);
 			}
 		}
 
 		return false;
 	}
 
+	void AbstractIOFileBoxUnit::_make_event_btn_reload() noexcept
+	{
+		btn_reload_.events().click([this](const arg_click&) {
+			if (this->_read_file())
+				combo_locale_.option(static_cast<std::size_t>(file_.locale()));
+		});
+	}
+
 	void AbstractIOFileBoxUnit::_make_event_combo_locale() noexcept
 	{
-		combo_locale_.events().selected([this](const nana::arg_combox& arg_combo) mutable
-		{
+		combo_locale_.events().selected([this](const nana::arg_combox& arg_combo) {
 			// update file locale
 			std::lock_guard<std::mutex> g(file_mutex_);
 			file_.locale(static_cast<FileIO::encoding>(arg_combo.widget.option()));
@@ -182,6 +195,8 @@ namespace text_overseer
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
 			"  <lab_name>"
+			"    <weight=70 btn_reload>"
+			"    <weight=3>"
 			"    <weight=25 btn_folder>"
 			"  >"
 			"  <textbox>"
@@ -194,6 +209,7 @@ namespace text_overseer
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
+		place_["btn_reload"] << btn_reload_;
 		place_["btn_folder"] << btn_folder_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
@@ -261,6 +277,8 @@ namespace text_overseer
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
 			"  <lab_name>"
+			"    <weight=70 btn_reload>"
+			"    <weight=3>"
 			"    <weight=25 btn_folder>"
 			"  >"
 			"  <textbox>"
@@ -273,6 +291,7 @@ namespace text_overseer
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
+		place_["btn_reload"] << btn_reload_;
 		place_["btn_folder"] << btn_folder_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
