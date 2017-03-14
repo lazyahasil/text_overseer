@@ -15,7 +15,7 @@
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-#define VERSION_STRING "0.2.1"
+#define VERSION_STRING "0.2.2"
 
 namespace text_overseer
 {
@@ -150,7 +150,6 @@ namespace text_overseer
 		MainWindow();
 
 		auto& io_tab_pages() noexcept { return io_tab_pages_; }
-		void make_timers_tabbar_color_animation(std::size_t pos) noexcept;
 		void remove_timer_tabbar_color_animation(std::size_t pos) noexcept;
 
 	private:
@@ -161,6 +160,7 @@ namespace text_overseer
 		) noexcept;
 		void _make_events() noexcept;
 		void _make_timer_io_tab_state() noexcept;
+		void _make_timer_tabbar_color_animation(std::size_t pos) noexcept;
 		void _search_io_files() noexcept;
 
 		nana::place place_{ *this };
@@ -175,9 +175,9 @@ namespace text_overseer
 			u8"사용한 라이브러리: <green size=10>Nana C++ GUI Library</>, <green size=10>Boost.Filesystem</>"
 		};
 		nana::button btn_refresh_{ *this, u8"입출력 파일 다시 찾기" };
+
 		nana::tabbar<std::string> tabbar_{ *this };
 		std::vector<std::shared_ptr<IOFilesTabPage>> io_tab_pages_;
-		//nana::panel<false> empty_tab_page_{ *this };
 
 		nana::timer timer_io_tab_state_;
 

@@ -42,6 +42,7 @@ namespace text_overseer
 		
 		// widgets
 		btn_reload_.enabled(false);
+		API::window_icon(btn_folder_, paint::image(R"(%PATH%\shell32.dll,4)"));
 
 		// make event
 		_make_event_btn_reload();
@@ -325,14 +326,15 @@ namespace text_overseer
 			appear::decorate<appear::sizable, appear::minimize>())
 	{
 		caption(std::string(u8"Text I/O File Overseer v") + VERSION_STRING);
+		nana::API::track_window_size(*this, { 500, 240 }, false); //minimum window size
 
 		// div
 		place_.div(
 			"<vert "
 			"  <weight=80 margin=[4, 3, 10, 3] "
 			"    <vert "
-			"      <margin=[0, 0, 0, 3] weight=20 lab_title>"
-			"      <margin=[0, 0, 0, 10] lab_welcome>"
+			"      <weight=18 margin=[0, 0, 2, 3] lab_title>"
+			"      <margin=[0, 0, 2, 10] lab_welcome>"
 			"    >"
 			"    <weight=150 btn_refresh>"
 			"  >"
@@ -356,43 +358,6 @@ namespace text_overseer
 		// make events and etc.
 		_make_events();
 		_make_timer_io_tab_state();
-	}
-
-	void MainWindow::make_timers_tabbar_color_animation(std::size_t pos) noexcept
-	{
-		const auto func_color_level = [](unsigned int time) -> double {
-			if (time >= 400 && time <= 1600)
-				return 1.0 - static_cast<double>(time - 400) / 1200;
-			return 1.0;
-		};
-
-		if (timers_tabbar_color_animation_.size() <= pos)
-			timers_tabbar_color_animation_.resize(pos + 1);
-
-		if (timers_tabbar_color_animation_[pos].timer_ptr)
-			return;
-
-		auto timer_tca = std::make_shared<timer>(); // tca = tabbar_color_animation
-		timer_tca->interval(20);
-		timer_tca->elapse([this, index = pos, interval = timer_tca->interval(), &func_color_level]{
-			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
-			auto factor = func_color_level(time);
-			this->tabbar_.tab_bgcolor(
-				index,
-				color(0xff - static_cast<int>(factor * 0x14),
-					0xff - static_cast<int>(factor * 0x9e),
-					0xff - static_cast<int>(factor * 0xff))
-			);
-			time += interval;
-			if (time >= 1600)
-				this->remove_timer_tabbar_color_animation(index);
-		});
-
-		auto& timer_data = timers_tabbar_color_animation_[pos];
-		timer_data.timer_ptr = std::move(timer_tca);
-		timer_data.elapsed_time = 0U;
-
-		timer_data.timer_ptr->start();
 	}
 
 	void MainWindow::remove_timer_tabbar_color_animation(std::size_t pos) noexcept
@@ -441,11 +406,48 @@ namespace text_overseer
 			for (std::size_t i = 0; i < size; i++)
 			{
 				if (io_tab_pages()[i]->update_io_file_box_state())
-					this->make_timers_tabbar_color_animation(i);
+					this->_make_timer_tabbar_color_animation(i);
 			}
 		});
 		timer_io_tab_state_.interval(100);
 		timer_io_tab_state_.start();
+	}
+
+	void MainWindow::_make_timer_tabbar_color_animation(std::size_t pos) noexcept
+	{
+		const auto func_color_level = [](unsigned int time) -> double {
+			if (time >= 400 && time <= 1600)
+				return 1.0 - static_cast<double>(time - 400) / 1200;
+			return 1.0;
+		};
+
+		if (timers_tabbar_color_animation_.size() <= pos)
+			timers_tabbar_color_animation_.resize(pos + 1);
+
+		if (timers_tabbar_color_animation_[pos].timer_ptr)
+			return;
+
+		auto timer_tca = std::make_shared<timer>(); // tca = tabbar_color_animation
+		timer_tca->interval(20);
+		timer_tca->elapse([this, index = pos, interval = timer_tca->interval(), &func_color_level]{
+			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
+		auto factor = func_color_level(time);
+		this->tabbar_.tab_bgcolor(
+			index,
+			color(0xff - static_cast<int>(factor * 0x14),
+				0xff - static_cast<int>(factor * 0x9e),
+				0xff - static_cast<int>(factor * 0xff))
+		);
+		time += interval;
+		if (time >= 1600)
+			this->remove_timer_tabbar_color_animation(index);
+		});
+
+		auto& timer_data = timers_tabbar_color_animation_[pos];
+		timer_data.timer_ptr = std::move(timer_tca);
+		timer_data.elapsed_time = 0U;
+
+		timer_data.timer_ptr->start();
 	}
 
 	void MainWindow::_search_io_files() noexcept

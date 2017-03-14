@@ -108,6 +108,6 @@ private:
 
 	std::basic_fstream<unsigned char>	file_;
 	std::ios::openmode					file_openmode_;
-	encoding								file_locale_{ encoding::system };
+	encoding							file_locale_{ encoding::system };
 	std::wstring						filename_;
 };
