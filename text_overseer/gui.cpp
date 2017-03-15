@@ -238,28 +238,63 @@ namespace text_overseer
 		}
 
 		std::string buf;
+		std::u16string u16_buf;
 		auto locale = file_.locale();
 
 		if (locale == FileIO::encoding::unknown || locale == FileIO::encoding::system)
 		{
 			std::wstring wstr = textbox_.caption_wstring();
+
+			// texts from nana use the newline escape as \n\r(LF CR)
+			// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
+			std::size_t pos = 0;
+			while ((pos = wstr.find(L"\n\r", pos + 1)) != std::wstring::npos)
+			{
+				wstr[pos] = L'\r';
+				wstr[++pos] = L'\n';
+			}
+
 			using LocalFacet = DeletableFacet<std::codecvt_byname<wchar_t, char, std::mbstate_t>>;
 			std::wstring_convert<LocalFacet> converter(new LocalFacet(""));
 			buf = converter.to_bytes(wstr);
 		}
-		else if (locale == FileIO::encoding::utf8)
+		else // UTF-8 or UTF-16LE
 		{
 			buf = textbox_.caption();
+
+			// texts from nana use the newline escape as \n\r(LF CR)
+			// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
+			std::size_t pos = 0;
+			while ((pos = buf.find("\n\r", pos + 1)) != std::string::npos)
+			{
+				buf[pos] = '\r';
+				buf[++pos] = '\n';
+			}
+
+			if (locale == FileIO::encoding::utf16_le) // UTF-16LE
+			{
+				// charset(u8_str, unicode::utf8).to_bytes(unicode::utf16) is not good
+				// => better use std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>
+
+#if _MSC_VER == 1900 // Visual Studio bug: https://connect.microsoft.com/VisualStudio/feedback/details/1403302
+				std::wstring_convert<std::codecvt_utf8_utf16<int16_t>, int16_t> converter;
+				auto u16_int_str = converter.from_bytes(buf);
+				u16_buf.assign(reinterpret_cast<const char16_t*>(u16_int_str.data()), u16_int_str.size());
+#else
+				std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
+				u16_buf = converter.from_bytes(buf);
+#endif
+			}
 		}
-		else // UTF-16LE
-		{
-			std::string u8_str = textbox_.caption();
-			buf = charset(u8_str, unicode::utf8).to_bytes(unicode::utf16);
-		}
+		
+		
 
 		try
 		{
-			file_.write_all(buf, buf.size());
+			if (locale == FileIO::encoding::utf16_le)
+				file_.write_all(u16_buf.data(), u16_buf.size() * 2);
+			else
+				file_.write_all(buf.data(), buf.size());
 		}
 		catch (std::exception& e)
 		{

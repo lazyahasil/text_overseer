@@ -83,8 +83,8 @@ public:
 	std::string read_all();
 	std::u16string read_all_u16();
 
-	template <class ConstStringBuffer>
-	void write_all(ConstStringBuffer buf, std::size_t length)
+	template <class StringBuffer>
+	void write_all(const StringBuffer& buf, std::size_t byte_length)
 	{
 		if (!_write_file_check())
 			return;
@@ -93,7 +93,7 @@ public:
 			file_.write(bom::k_u8, 3);
 		else if (file_locale_ == encoding::utf16_le)
 			file_.write(bom::k_u16_le, 2);
-		file_.write(reinterpret_cast<const unsigned char*>(&buf[0]), length);
+		file_.write(reinterpret_cast<const unsigned char*>(&buf[0]), byte_length);
 	}
 
 private:

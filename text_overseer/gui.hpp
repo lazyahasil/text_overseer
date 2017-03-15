@@ -15,7 +15,7 @@
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-#define VERSION_STRING "0.2.2"
+#define VERSION_STRING "0.2.3"
 
 namespace text_overseer
 {
