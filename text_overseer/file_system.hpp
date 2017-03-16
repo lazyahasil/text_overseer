@@ -172,7 +172,8 @@ namespace file_system
 	)
 	{
 		enum class PeriodEnum { msecs, secs, mins, hours, days } base_period;
-		auto counted = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+		const auto counted = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+		auto remainder = counted;
 
 		if (counted == 0)
 			return periods.just_a_moment;
@@ -188,24 +189,24 @@ namespace file_system
 		else
 			base_period = PeriodEnum::msecs;
 
-		const auto msecs = counted % 1000;
-		counted /= 1000;
-		const auto secs = counted % 60;
-		counted /= 60;
-		const auto mins = counted % 60;
-		counted /= 60;
-		const auto hours = counted % 24;
-		counted /= 24;
-		const auto days = counted;
+		const auto msecs = remainder % 1000;
+		remainder /= 1000;
+		const auto secs = remainder % 60;
+		remainder /= 60;
+		const auto mins = remainder % 60;
+		remainder /= 60;
+		const auto hours = remainder % 24;
+		remainder /= 24;
+		const auto days = remainder;
 
 		// a pointer to the period string
 		const PeriodStringT* period = nullptr;
 		// check if the duration is smaller than a base period
-		if ((msecs == 0 && base_period == PeriodEnum::msecs)
-			|| (secs == 0 && base_period == PeriodEnum::secs)
-			|| (mins == 0 && base_period == PeriodEnum::mins)
-			|| (hours == 0 && base_period == PeriodEnum::hours)
-			|| (days == 0 && base_period == PeriodEnum::days))
+		if ((counted == 0 && base_period == PeriodEnum::msecs)
+			|| (counted < 1000 && base_period == PeriodEnum::secs)
+			|| (counted < 1000 * 60 && base_period == PeriodEnum::mins)
+			|| (counted < 1000 * 3600 && !hours && base_period == PeriodEnum::hours)
+			|| (counted < 1000 * 86400 && base_period == PeriodEnum::days))
 			return periods.just_a_moment;
 		
 		StringT str;

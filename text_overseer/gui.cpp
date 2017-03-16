@@ -5,7 +5,7 @@
 
 using namespace nana;
 
-namespace text_overseer
+namespace gui
 {
 	AbstractBoxUnit::AbstractBoxUnit(nana::window wd) : nana::panel<false>(wd)
 	{
@@ -42,7 +42,6 @@ namespace text_overseer
 		
 		// widgets
 		btn_reload_.enabled(false);
-		API::window_icon(btn_folder_, paint::image(R"(%PATH%\shell32.dll,4)"));
 
 		// make event
 		_make_event_btn_reload();
@@ -124,17 +123,6 @@ namespace text_overseer
 
 		file_.close();
 		return true;
-
-		//#if _MSC_VER == 1900
-		//		// Visual Studio bug: https://connect.microsoft.com/VisualStudio/feedback/details/1403302
-		//		std::wstring_convert<std::codecvt_utf8_utf16<int16_t>, int16_t> converter;
-		//		auto u16_ptr = reinterpret_cast<const int16_t*>(u16_str.data());
-		//		textbox_.caption( converter.to_bytes(u16_ptr, u16_ptr + u16_str.size()) );
-		//
-		//#else
-		//		std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
-		//		textbox_.caption(converter.to_bytes(u16_str));
-		//#endif
 	}
 
 	bool AbstractIOFileBoxUnit::_check_last_write_time() noexcept
@@ -287,8 +275,6 @@ namespace text_overseer
 			}
 		}
 		
-		
-
 		try
 		{
 			if (locale == FileIO::encoding::utf16_le)
@@ -476,8 +462,8 @@ namespace text_overseer
 		auto factor = func_color_level(time);
 		this->tabbar_.tab_bgcolor(
 			index,
-			color(0xff - static_cast<int>(factor * 0x14),
-				0xff - static_cast<int>(factor * 0x9e),
+			color(0xff - static_cast<int>(factor * 0x00), // #ff8c00 dark orange
+				0xff - static_cast<int>(factor * 0x73),
 				0xff - static_cast<int>(factor * 0xff))
 		);
 		time += interval;

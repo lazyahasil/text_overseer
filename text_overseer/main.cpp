@@ -1,8 +1,9 @@
 ﻿#include "gui.hpp"
+#include "error_handler.hpp"
 
 int main()
 {
-	text_overseer::MainWindow window;
+	gui::MainWindow window;
 
 	window.show();
 

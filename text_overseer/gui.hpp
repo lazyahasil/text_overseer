@@ -15,13 +15,12 @@
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-#define VERSION_STRING "0.2.3"
+#define VERSION_STRING "0.2.3.1"
 
-namespace text_overseer
+namespace gui
 {
 	constexpr int k_max_read_file_count = 3;
 	constexpr int k_max_check_count_last_file_write = 5;
-
 
 	class AbstractBoxUnit : public nana::panel<false>
 	{
