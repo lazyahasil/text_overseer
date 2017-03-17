@@ -1,5 +1,6 @@
 ﻿#include "gui.hpp"
 #include "error_handler.hpp"
+#include "rc_overseer.hpp"
 
 #include <codecvt>
 
@@ -214,7 +215,7 @@ namespace gui
 
 	bool InputFileBoxUnit::_write_file()
 	{
-		file_mutex_.lock(); // must unlock before return!!
+		file_mutex_.lock(); // MUST unlock before return!!
 
 		if (!file_.open(std::ios::out | std::ios::binary))
 		{
@@ -294,7 +295,7 @@ namespace gui
 		file_mutex_.unlock();
 
 		// In mutex lock situation, it will cause nana gui exception(busy device).
-		// [this program will terminate when _write_file() is noexcept!!]
+		// *** this program will terminate when _write_file() is noexcept and in mutex lock!! ***
 		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
 		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
 		return true;
@@ -353,30 +354,37 @@ namespace gui
 		: form(API::make_center(640, 400),
 			appear::decorate<appear::sizable, appear::minimize>())
 	{
-		caption(std::string(u8"Text I/O File Overseer v") + VERSION_STRING);
-		nana::API::track_window_size(*this, { 500, 240 }, false); //minimum window size
+		caption(std::string(u8"Text I/O File Overseer v") + k_version_str);
+		nana::API::track_window_size(*this, { 590, 240 }, false); //minimum window size
 
 		// div
 		place_.div(
 			"<vert "
-			"  <weight=80 margin=[4, 3, 10, 3] "
+			"    <weight=80 margin=[4, 3, 10, 3] "
+			"    <weight=64 pic_logo>"
 			"    <vert "
 			"      <weight=18 margin=[0, 0, 2, 3] lab_title>"
 			"      <margin=[0, 0, 2, 10] lab_welcome>"
 			"    >"
-			"    <weight=150 btn_refresh>"
+			"    <weight=150 margin=[0, 0, 0, 3] btn_refresh>"
 			"  >"
 			"  <weight=25 tabbar>"
 			"  <margin=[5, 0, 3, 0] tab_frame>"
 			">"
 		);
+		place_["pic_logo"] << pic_logo_;
 		place_["lab_title"] << lab_title_;
 		place_["lab_welcome"] << lab_welcome_;
 		place_["btn_refresh"] << btn_refresh_;
 		place_["tabbar"] << tabbar_;
 		place_.collocate();
 
-		// widget initiation
+		// widget initiation - label
+		paint::image img_logo;
+		img_logo.open(k_overseer_bmp, k_overseer_bmp_size);
+		pic_logo_.load(img_logo);
+
+		// widget initiation - label
 		lab_title_.format(true);
 		lab_welcome_.format(true);
 
@@ -386,15 +394,6 @@ namespace gui
 		// make events and etc.
 		_make_events();
 		_make_timer_io_tab_state();
-	}
-
-	void MainWindow::remove_timer_tabbar_color_animation(std::size_t pos) noexcept
-	{
-		auto& timer_data = timers_tabbar_color_animation_[pos];
-		if (!timer_data.timer_ptr)
-			return;
-		timer_data.timer_ptr->stop();
-		timer_data.timer_ptr.reset();
 	}
 
 	void MainWindow::_create_io_tab_page(
@@ -416,14 +415,43 @@ namespace gui
 
 	void MainWindow::_make_events() noexcept
 	{
+		// pic_logo_ is clicked => modify lab_title_ caption
+		pic_logo_.events().click([this](const arg_click&) {
+			static bool was_called = false;
+			if (!was_called)
+			{
+				std::string str;
+				// change lab_title_
+				str = this->lab_title_.caption();
+				str.replace(
+					str.find(u8"감시기"),
+					sizeof(u8"감시기") - 1,
+					u8"<color=0x800080>감시군주</>"
+				);
+				this->lab_title_.caption(str);
+				// change lab_welcome_
+				str = this->lab_welcome_.caption();
+				str.replace(
+					str.find(u8"감시"),
+					sizeof(u8"감시") - 1,
+					u8"<bold color=0x800080>탐지</>"
+				);
+				this->lab_welcome_.caption(str);
+				// set flag to get this doing once
+				was_called = true;
+			}
+		});
+
+		// btn_refresh_ is clicked => _search_io_files()
 		btn_refresh_.events().click([this](const arg_click&) {
 			this->_search_io_files();
 		});
 
-		this->events().unload([this](const arg_unload& ei) {
+		// trying to unload MainWindow => msgbox
+		this->events().unload([this](const arg_unload& arg) {
 			msgbox mb(*this, u8"프로그램 종료", msgbox::yes_no);
 			mb.icon(msgbox::icon_question) << u8"정말로 종료하시겠습니까?";
-			ei.cancel = (mb() == msgbox::pick_no);
+			arg.cancel = (mb() == msgbox::pick_no);
 		});
 	}
 
@@ -459,16 +487,16 @@ namespace gui
 		timer_tca->interval(20);
 		timer_tca->elapse([this, index = pos, interval = timer_tca->interval(), &func_color_level]{
 			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
-		auto factor = func_color_level(time);
-		this->tabbar_.tab_bgcolor(
-			index,
-			color(0xff - static_cast<int>(factor * 0x00), // #ff8c00 dark orange
-				0xff - static_cast<int>(factor * 0x73),
-				0xff - static_cast<int>(factor * 0xff))
-		);
-		time += interval;
-		if (time >= 1600)
-			this->remove_timer_tabbar_color_animation(index);
+			auto factor = func_color_level(time);
+			this->tabbar_.tab_bgcolor(
+				index,
+				color(0xff - static_cast<int>(factor * 0x00), // #ff8c00 dark orange
+					0xff - static_cast<int>(factor * 0x73),
+					0xff - static_cast<int>(factor * 0xff))
+			);
+			time += interval;
+			if (time >= 1600)
+				this->_remove_timer_tabbar_color_animation(index);
 		});
 
 		auto& timer_data = timers_tabbar_color_animation_[pos];
@@ -478,13 +506,22 @@ namespace gui
 		timer_data.timer_ptr->start();
 	}
 
+	void MainWindow::_remove_timer_tabbar_color_animation(std::size_t pos) noexcept
+	{
+		auto& timer_data = timers_tabbar_color_animation_[pos];
+		if (!timer_data.timer_ptr)
+			return;
+		timer_data.timer_ptr->stop();
+		timer_data.timer_ptr.reset();
+	}
+
 	void MainWindow::_search_io_files() noexcept
 	{
 		auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
 		timer_io_tab_state_.stop();
 
 		for (std::size_t i = 0U; i < timers_tabbar_color_animation_.size(); i++)
-			remove_timer_tabbar_color_animation(i);
+			_remove_timer_tabbar_color_animation(i);
 
 		auto pair_file_pairs_and_path_ecs = file_system::search_input_output_files(L"input.txt", L"output.txt");
 		auto file_pairs = std::move(pair_file_pairs_and_path_ecs.first);
@@ -535,5 +572,8 @@ namespace gui
 
 		if (timer_io_tab_state_was_going)
 			timer_io_tab_state_.start();
+
+		for (std::size_t i = 0U; i < io_tab_pages_.size(); i++)
+			_make_timer_tabbar_color_animation(i);
 	}
 }

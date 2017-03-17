@@ -167,6 +167,7 @@
     <ClInclude Include="file_system.hpp" />
     <ClInclude Include="gui.hpp" />
     <ClInclude Include="file_io.hpp" />
+    <ClInclude Include="rc_overseer.hpp" />
     <ClInclude Include="singleton.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -12,13 +12,13 @@
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/panel.hpp>
+#include <nana/gui/widgets/picture.hpp>
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-#define VERSION_STRING "0.2.3.1"
-
 namespace gui
 {
+	constexpr char* k_version_str = "0.2.3.2";
 	constexpr int k_max_read_file_count = 3;
 	constexpr int k_max_check_count_last_file_write = 5;
 
@@ -149,7 +149,6 @@ namespace gui
 		MainWindow();
 
 		auto& io_tab_pages() noexcept { return io_tab_pages_; }
-		void remove_timer_tabbar_color_animation(std::size_t pos) noexcept;
 
 	private:
 		void _create_io_tab_page(
@@ -160,9 +159,11 @@ namespace gui
 		void _make_events() noexcept;
 		void _make_timer_io_tab_state() noexcept;
 		void _make_timer_tabbar_color_animation(std::size_t pos) noexcept;
+		void _remove_timer_tabbar_color_animation(std::size_t pos) noexcept;
 		void _search_io_files() noexcept;
 
 		nana::place place_{ *this };
+		nana::picture pic_logo_{ *this };
 		nana::label lab_title_{
 			*this,
 			u8"<bold>텍스트 입출력 파일 감시기(Text Input/Output File Overseer)</>"
