@@ -2,13 +2,28 @@
 
 #include <fstream>
 
-namespace bom // Byte Order Mark
+namespace file_io_detail
 {
-	constexpr unsigned char k_u8[3]{ 0xEF, 0xBB, 0xBF };
-	constexpr unsigned char k_u16_le[2]{ 0xFF, 0xFE };
-	//constexpr unsigned char bom_u16_be[]{ 0xFE, 0xFF };
+	namespace bom // Byte Order Mark
+	{
+		constexpr unsigned char k_u8[3]{ 0xEF, 0xBB, 0xBF };
+		constexpr unsigned char k_u16_le[2]{ 0xFF, 0xFE };
+		//constexpr unsigned char bom_u16_be[]{ 0xFE, 0xFF };
+	}
+
+	namespace newline
+	{
+		const std::basic_string<unsigned char> k_ascii_cr_lf{ 0x0D, 0x0A };
+		//const std::basic_string<unsigned char> k_ascii_lf{ 0x0A };
+		const std::basic_string<unsigned char> k_u16le_cr_lf{ 0x0D, 0x00, 0x0A, 0x00 };
+		//const std::basic_string<unsigned char> k_u16le_lf{ 0x0A, 0x00 };
+		const auto k_ascii_default = k_ascii_cr_lf;
+		const auto k_u16le_default = k_u16le_cr_lf;
+	}
 }
 
+// a class that supports text file reading & writing;
+// it also can handle the system encoding and unicode, and can take care of BOM(Byte Order Mark)
 class FileIO
 {
 public:
@@ -30,20 +45,19 @@ public:
 		encoding file_locale = encoding::system
 	) : filename_(std::move(filename)), file_locale_(file_locale) { }
 
-	bool open(std::ios::openmode mode);
+	bool open(std::ios::openmode mode); // needs std::ios::binary
 	void close() noexcept { file_.close(); }
 	const wchar_t* filename() const noexcept { return filename_.c_str(); }
 	const std::wstring& filename_wstring() const noexcept { return filename_; }
 
 	template <class StringT>
-	void filename(StringT&& filename) noexcept
-	{
-		filename_ = std::forward<StringT>(filename);
-	}
+	void filename(StringT&& filename) noexcept { filename_ = std::forward<StringT>(filename); }
 
+	long long stream_size(); // includes _read_file_check()
 	encoding locale() const noexcept { return file_locale_; }
 	void locale(encoding locale) noexcept;
 	encoding read_bom(); // includes _read_file_check()
+	bool write_bom(); // includes _write_file_check()
 	bool update_locale_by_read_bom();  // includes read_bom()
 
 	template <class MutableStringBuffer>
@@ -64,8 +78,7 @@ public:
 				throw std::runtime_error("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
 		}
 		std::streamoff bom_length = file_.tellg();
-		file_.seekg(0, std::ios::end);
-		auto size = static_cast<std::size_t>(file_.tellg() - bom_length); // string length
+		auto size = static_cast<std::size_t>(stream_size() - bom_length); // string length
 		auto sequence_length = do_write_16_bit ? (size / 2 + size % 2) : size;
 		if (buf_size < size)
 		{
@@ -84,19 +97,55 @@ public:
 	std::u16string read_all_u16();
 
 	template <class StringBuffer>
-	void write_all(const StringBuffer& buf, std::size_t byte_length)
+	bool write_all(const StringBuffer& buf, std::size_t byte_length)
 	{
-		if (!_write_file_check())
-			return;
-		file_.seekg(0, std::ios::beg);
-		if (file_locale_ == encoding::utf8)
-			file_.write(bom::k_u8, 3);
-		else if (file_locale_ == encoding::utf16_le)
-			file_.write(bom::k_u16_le, 2);
+		if (!write_bom()) // includes _write_file_check()
+			return false;
 		file_.write(reinterpret_cast<const unsigned char*>(&buf[0]), byte_length);
+		return true;
 	}
 
-private:
+	template <class StringBuffer>
+	bool write_some(const StringBuffer& buf, std::size_t byte_length)
+	{
+		if (file_.tellg() == 0LL)
+		{
+			// write BOM if the file is empty
+			if (!write_bom()) // includes _write_file_check()
+				return false;
+		}
+		else
+		{
+			if (!_write_file_check())
+				return false;
+		}
+
+		file_.write(reinterpret_cast<const unsigned char*>(&buf[0]), byte_length);
+		return true;
+	}
+
+	template <class ConstStringBuffer, class CharT>
+	bool write_line(
+		const ConstStringBuffer& buf,
+		std::size_t byte_length,
+		const std::basic_string<CharT>& newline
+	)
+	{
+		if (!write_some(buf, byte_length) || newline.empty())
+			return false;
+		file_.write(reinterpret_cast<const unsigned char*>(newline.data()), newline.size());
+		return true;
+	}
+
+	template <class ConstStringBuffer>
+	bool write_line(const ConstStringBuffer& buf, std::size_t byte_length)
+	{
+		if (file_locale_ == encoding::utf16_le)
+			return write_line(buf, byte_length, file_io_detail::newline::k_u16le_default);
+		return write_line(buf, byte_length, file_io_detail::newline::k_ascii_default);
+	}
+
+protected:
 	bool FileIO::_read_file_check();
 	bool FileIO::_write_file_check();
 

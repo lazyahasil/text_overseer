@@ -169,6 +169,7 @@
     <ClInclude Include="file_io.hpp" />
     <ClInclude Include="rc_overseer.hpp" />
     <ClInclude Include="singleton.hpp" />
+    <ClInclude Include="text_overseer.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

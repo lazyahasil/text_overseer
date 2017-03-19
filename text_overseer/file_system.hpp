@@ -240,7 +240,6 @@ namespace file_system
 		{
 			str += boost::lexical_cast<StringT>(msecs)
 				+ (msecs != 1 ? periods.msecs_plural : periods.msecs_singular);
-			did_eariler = true;
 		}
 
 		return str;

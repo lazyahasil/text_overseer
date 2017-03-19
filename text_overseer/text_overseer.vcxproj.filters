@@ -47,5 +47,8 @@
     <ClInclude Include="rc_overseer.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="text_overseer.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

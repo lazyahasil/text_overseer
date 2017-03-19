@@ -1,10 +1,12 @@
 ﻿#include "gui.hpp"
+#include "text_overseer.hpp"
 #include "error_handler.hpp"
 #include "rc_overseer.hpp"
 
 #include <codecvt>
 
 using namespace nana;
+using namespace text_overseer;
 
 namespace gui
 {
@@ -23,7 +25,7 @@ namespace gui
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0] lab_name>"
 			"  <textbox>"
-			"  <weight=45 margin=[3,0,0,0] lab_state>"
+			"  <weight=42 margin=[3,0,0,0] lab_state>"
 			">"
 		);
 		place_["lab_name"] << lab_name_;
@@ -31,6 +33,7 @@ namespace gui
 		place_["lab_state"] << lab_state_;
 
 		lab_name_.caption(u8"<size=11>문제에서 제시한 출력</>");
+		lab_state_.caption(u8"텍스트 비교 기능 미완성");
 	}
 
 	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(nana::window wd) : AbstractBoxUnit(wd)
@@ -64,10 +67,13 @@ namespace gui
 					break;
 			}
 
-			if (did_read_file)
-				combo_locale_.option(static_cast<std::size_t>(file_.locale()));
-			else
+			if (!did_read_file)
+			{
 				lab_state_.caption(u8"파일을 열지 못했습니다.");
+				return false;
+			}
+			combo_locale_.option(static_cast<std::size_t>(file_.locale()));
+				
 		}
 		else if (!last_write_time_is_vaild_)
 		{
@@ -141,7 +147,8 @@ namespace gui
 				break;
 		}
 
-		if (last_write_time_ < time_gotton)
+		if ( last_write_time_ < time_gotton
+			|| (!last_write_time_is_vaild_ && time_gotton.time_since_epoch().count() != 0LL) )
 		{
 			last_write_time_ = time_gotton;
 			last_write_time_is_vaild_ = true;
@@ -153,7 +160,13 @@ namespace gui
 		{
 			if (last_write_time_is_vaild_)
 			{
-				ErrorHdr::instance().report(ErrorHdr::priority::info, ec.value(), ec.message().c_str());
+				ErrorHdr::instance().report(
+					ErrorHdr::priority::info,
+					ec.value(),
+					std::string("cannot check the last write time - ")
+						+ charset(ec.message()).to_bytes(unicode::utf8),
+					text_overseer::wstr_to_utf8(file_.filename())
+				);
 				last_write_time_is_vaild_ = false;
 				btn_reload_.enabled(false);
 			}
@@ -165,8 +178,7 @@ namespace gui
 	void AbstractIOFileBoxUnit::_make_event_btn_reload() noexcept
 	{
 		btn_reload_.events().click([this](const arg_click&) {
-			if (this->_read_file())
-				combo_locale_.option(static_cast<std::size_t>(file_.locale()));
+			reload_file();
 		});
 	}
 
@@ -186,21 +198,21 @@ namespace gui
 			"  <weight=25 margin=[0,0,3,0]"
 			"  <lab_name>"
 			"    <weight=70 btn_reload>"
-			"    <weight=3>"
-			"    <weight=25 btn_folder>"
+			//"    <weight=3>"
+			//"    <weight=25 btn_folder>"
 			"  >"
 			"  <textbox>"
-			"  <weight=45 margin=[3,0,0,0]"
-			"    <vert "
-			"      <lab_state>"
-			"      < <> <weight=100 margin=[0,3,0,0] combo_locale> >"
+			"  <weight=42 margin=[3,0,0,0]"
+			"    <vert margin=[0,3,0,0]"
+			"      <margin=[0,0,3,0] lab_state>"
+			"      < <> <weight=100 combo_locale> >"
 			"    >"
 			"    <weight=80 btn_save>"
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
 		place_["btn_reload"] << btn_reload_;
-		place_["btn_folder"] << btn_folder_;
+		//place_["btn_folder"] << btn_folder_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 		place_["combo_locale"] << combo_locale_;
@@ -227,54 +239,27 @@ namespace gui
 		}
 
 		std::string buf;
-		std::u16string u16_buf;
 		auto locale = file_.locale();
 
 		if (locale == FileIO::encoding::unknown || locale == FileIO::encoding::system)
-		{
-			std::wstring wstr = textbox_.caption_wstring();
-
-			// texts from nana use the newline escape as \n\r(LF CR)
-			// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
-			std::size_t pos = 0;
-			while ((pos = wstr.find(L"\n\r", pos + 1)) != std::wstring::npos)
-			{
-				wstr[pos] = L'\r';
-				wstr[++pos] = L'\n';
-			}
-
-			using LocalFacet = DeletableFacet<std::codecvt_byname<wchar_t, char, std::mbstate_t>>;
-			std::wstring_convert<LocalFacet> converter(new LocalFacet(""));
-			buf = converter.to_bytes(wstr);
-		}
+			buf = wstr_to_mstr(textbox_.caption_wstring());
 		else // UTF-8 or UTF-16LE
-		{
 			buf = textbox_.caption();
 
-			// texts from nana use the newline escape as \n\r(LF CR)
-			// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
-			std::size_t pos = 0;
-			while ((pos = buf.find("\n\r", pos + 1)) != std::string::npos)
-			{
-				buf[pos] = '\r';
-				buf[++pos] = '\n';
-			}
-
-			if (locale == FileIO::encoding::utf16_le) // UTF-16LE
-			{
-				// charset(u8_str, unicode::utf8).to_bytes(unicode::utf16) is not good
-				// => better use std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>
-
-#if _MSC_VER == 1900 // Visual Studio bug: https://connect.microsoft.com/VisualStudio/feedback/details/1403302
-				std::wstring_convert<std::codecvt_utf8_utf16<int16_t>, int16_t> converter;
-				auto u16_int_str = converter.from_bytes(buf);
-				u16_buf.assign(reinterpret_cast<const char16_t*>(u16_int_str.data()), u16_int_str.size());
-#else
-				std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> converter;
-				u16_buf = converter.from_bytes(buf);
-#endif
-			}
+		// texts from nana use the newline escape as \n\r(LF CR)
+		// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
+		std::size_t pos = 0;
+		while ( (pos = buf.find("\n\r", pos + 1)) != std::string::npos )
+		{
+			buf[pos] = '\r';
+			buf[++pos] = '\n';
 		}
+
+		std::u16string u16_buf;
+
+		// charset(u8_str, unicode::utf8).to_bytes(unicode::utf16) is not good; better use std::wstring_convert
+		if (locale == FileIO::encoding::utf16_le) // UTF-16LE
+			u16_buf = utf16_to_utf8(buf);
 		
 		try
 		{
@@ -308,21 +293,21 @@ namespace gui
 			"  <weight=25 margin=[0,0,3,0]"
 			"  <lab_name>"
 			"    <weight=70 btn_reload>"
-			"    <weight=3>"
-			"    <weight=25 btn_folder>"
+			//"    <weight=3>"
+			//"    <weight=25 btn_folder>"
 			"  >"
 			"  <textbox>"
-			"  <weight=45 margin=[3,0,0,0]"
-			"    <vert "
-			"      <lab_state>"
-			"      < <> <weight=100 margin=[0,3,0,0] combo_locale> >"
+			"  <weight=42 margin=[3,0,0,0]"
+			"    <vert margin=[0,3,0,0]"
+			"      <margin=[0,0,3,0] lab_state>"
+			"      < <> <weight=100 combo_locale> >"
 			"    >"
 			"    <weight=80>"
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
 		place_["btn_reload"] << btn_reload_;
-		place_["btn_folder"] << btn_folder_;
+		//place_["btn_folder"] << btn_folder_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 		place_["combo_locale"] << combo_locale_;
@@ -354,17 +339,19 @@ namespace gui
 		: form(API::make_center(640, 400),
 			appear::decorate<appear::sizable, appear::minimize>())
 	{
+		// set the form's title
 		caption(std::string(u8"Text I/O File Overseer v") + k_version_str);
-		nana::API::track_window_size(*this, { 590, 240 }, false); //minimum window size
+		// set minimum window size
+		API::track_window_size(*this, { 590, 308 }, false);
 
 		// div
 		place_.div(
 			"<vert "
-			"    <weight=80 margin=[4, 3, 10, 3] "
-			"    <weight=64 pic_logo>"
+			"  <weight=82 margin=[4, 3, 10, 3] "
+			"    <weight=68 pic_logo>"
 			"    <vert "
-			"      <weight=18 margin=[0, 0, 2, 3] lab_title>"
-			"      <margin=[0, 0, 2, 10] lab_welcome>"
+			"      <weight=18 margin=[0, 0, 2, 5] lab_title>"
+			"      <margin=[0, 0, 4, 12] lab_welcome>"
 			"    >"
 			"    <weight=150 margin=[0, 0, 0, 3] btn_refresh>"
 			"  >"
@@ -383,6 +370,9 @@ namespace gui
 		paint::image img_logo;
 		img_logo.open(k_overseer_bmp, k_overseer_bmp_size);
 		pic_logo_.load(img_logo);
+		pic_logo_.transparent(true);
+		pic_logo_.stretchable(false);
+		pic_logo_.align(align::center, align_v::center);
 
 		// widget initiation - label
 		lab_title_.format(true);
@@ -415,20 +405,23 @@ namespace gui
 
 	void MainWindow::_make_events() noexcept
 	{
-		// pic_logo_ is clicked => modify lab_title_ caption
+		// pic_logo_ is clicked => modify lab_title_ caption and start debugging
 		pic_logo_.events().click([this](const arg_click&) {
+
 			static bool was_called = false;
-			if (!was_called)
+			if (!was_called) // first call
 			{
 				std::string str;
+
 				// change lab_title_
 				str = this->lab_title_.caption();
 				str.replace(
 					str.find(u8"감시기"),
 					sizeof(u8"감시기") - 1,
-					u8"<color=0x800080>감시군주</>"
+					u8"<color=0x800080>감시기</>"
 				);
 				this->lab_title_.caption(str);
+
 				// change lab_welcome_
 				str = this->lab_welcome_.caption();
 				str.replace(
@@ -437,9 +430,38 @@ namespace gui
 					u8"<bold color=0x800080>탐지</>"
 				);
 				this->lab_welcome_.caption(str);
+
 				// set flag to get this doing once
 				was_called = true;
 			}
+			else // second call
+			{
+				// start debugging to a log file
+				if (!ErrorHdr::instance().is_started())
+				{
+					msgbox mb(*this, u8"디버깅 시작", msgbox::yes_no);
+					mb.icon(msgbox::icon_question) << u8"로그 파일에 디버깅 정보를 기록하시겠습니까?";
+					if (mb() == msgbox::pick_yes)
+					{
+						// modify the form's title
+						this->caption(this->caption() + " (debug mode)");
+
+						// add a border to logo picture
+						drawing dw(*this);
+						dw.draw([this](paint::graphics& graph) {
+							point pos = this->pic_logo_.pos();
+							graph.rectangle(
+								rectangle(pos, nana::size(68, 68)), false, color_rgb(0x800080));
+							graph.rectangle(
+								rectangle(pos + point(1, 1), nana::size(66, 66)), false, color_rgb(0x800080));
+						});
+						dw.update();
+						//this->pic_logo_.bgcolor(color_rgb(0x800080)); // bgcolor() doesn't work here
+						ErrorHdr::instance().start();
+					}
+				}
+			}
+
 		});
 
 		// btn_refresh_ is clicked => _search_io_files()
@@ -487,12 +509,9 @@ namespace gui
 		timer_tca->interval(20);
 		timer_tca->elapse([this, index = pos, interval = timer_tca->interval(), &func_color_level]{
 			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
-			auto factor = func_color_level(time);
 			this->tabbar_.tab_bgcolor(
 				index,
-				color(0xff - static_cast<int>(factor * 0x00), // #ff8c00 dark orange
-					0xff - static_cast<int>(factor * 0x73),
-					0xff - static_cast<int>(factor * 0xff))
+				color(color_rgb(0xff8c00)).blend(colors::white, func_color_level(time)) // #ff8c00 dark orange
 			);
 			time += interval;
 			if (time >= 1600)
@@ -531,7 +550,11 @@ namespace gui
 		{
 			const auto ec = path_ec.error_code();
 			ErrorHdr::instance().report(
-				ErrorHdr::priority::info, ec.value(), ec.message().c_str(), path_ec.path_str().c_str()
+				ErrorHdr::priority::info,
+				ec.value(),
+				std::string("cannot open the path while file search - ")
+					+ charset(ec.message()).to_bytes(unicode::utf8),
+				text_overseer::wstr_to_utf8(path_ec.path_str())
 			);
 		}
 
@@ -547,7 +570,12 @@ namespace gui
 					break;
 				}
 			}
-			if (!are_already_in_tabs)
+
+			if (are_already_in_tabs)
+			{
+				io_tab_pages_[i]->reload_files();
+			}
+			else
 			{
 				tabbar_.erase(i); // it will change current activated tab; but can't manage to handle this
 				io_tab_pages_.erase(io_tab_pages_.begin() + i--);

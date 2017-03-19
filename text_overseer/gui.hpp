@@ -18,7 +18,6 @@
 
 namespace gui
 {
-	constexpr char* k_version_str = "0.2.3.2";
 	constexpr int k_max_read_file_count = 3;
 	constexpr int k_max_check_count_last_file_write = 5;
 
@@ -66,6 +65,14 @@ namespace gui
 			file_.filename(std::forward<StringT>(file_path));
 		}
 
+		bool reload_file() noexcept
+		{
+			auto is_done = this->_read_file();
+			if (is_done)
+				combo_locale_.option(static_cast<std::size_t>(file_.locale()));
+			return is_done;
+		}
+
 		decltype(auto) last_write_time() const noexcept { return file_system::TimePointOfSys(); }
 
 	protected:
@@ -93,13 +100,6 @@ namespace gui
 		InputFileBoxUnit(nana::window wd);
 
 	protected:
-		template <class Facet>
-		struct DeletableFacet : Facet
-		{
-			using Facet::Facet; // inherit constructors
-			~DeletableFacet() {}
-		};
-
 		virtual bool _write_file() override;
 
 		nana::button btn_save_{ *this, u8"저장" };
@@ -128,6 +128,11 @@ namespace gui
 		{
 			input_box_.register_file(input_filename);
 			output_box_.register_file(output_filename);
+		}
+
+		bool reload_files()
+		{
+			return input_box_.reload_file() || output_box_.reload_file();
 		}
 
 		decltype(auto) update_io_file_box_state()
