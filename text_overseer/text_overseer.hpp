@@ -4,7 +4,7 @@
 
 namespace text_overseer
 {
-	constexpr char* k_version_str = "0.2.4.0";
+	constexpr char* k_version_str = "0.2.4.1";
 
 	template <class Facet>
 	struct DeletableFacet : Facet
@@ -13,6 +13,7 @@ namespace text_overseer
 		~DeletableFacet() = default;
 	};
 
+	// @throws std::range_error: bad conversion caused by some unicode characters
 	template <class ConstWstringContainer>
 	std::string wstr_to_mstr(const ConstWstringContainer& wstr)
 	{

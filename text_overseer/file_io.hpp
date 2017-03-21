@@ -8,7 +8,7 @@ namespace file_io_detail
 	{
 		constexpr unsigned char k_u8[3]{ 0xEF, 0xBB, 0xBF };
 		constexpr unsigned char k_u16_le[2]{ 0xFF, 0xFE };
-		//constexpr unsigned char bom_u16_be[]{ 0xFE, 0xFF };
+		//constexpr unsigned char k_u16_be[2]{ 0xFE, 0xFF };
 	}
 
 	namespace newline
@@ -46,6 +46,7 @@ public:
 	) : filename_(std::move(filename)), file_locale_(file_locale) { }
 
 	bool open(std::ios::openmode mode); // needs std::ios::binary
+	bool is_open() noexcept { return file_.is_open(); }
 	void close() noexcept { file_.close(); }
 	const wchar_t* filename() const noexcept { return filename_.c_str(); }
 	const std::wstring& filename_wstring() const noexcept { return filename_; }

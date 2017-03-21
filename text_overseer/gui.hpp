@@ -19,6 +19,7 @@
 namespace gui
 {
 	constexpr int k_max_read_file_count = 3;
+	constexpr int k_max_try_to_update_widget = 5;
 	constexpr int k_max_check_count_last_file_write = 5;
 
 	class AbstractBoxUnit : public nana::panel<false>
@@ -76,7 +77,7 @@ namespace gui
 		decltype(auto) last_write_time() const noexcept { return file_system::TimePointOfSys(); }
 
 	protected:
-		bool _read_file() noexcept;
+		virtual bool _read_file();
 		virtual bool _write_file() = 0;
 
 		nana::button btn_reload_{ *this, u8"다시 읽기" };
@@ -100,9 +101,16 @@ namespace gui
 		InputFileBoxUnit(nana::window wd);
 
 	protected:
+		virtual bool _read_file() override;
 		virtual bool _write_file() override;
 
 		nana::button btn_save_{ *this, u8"저장" };
+
+	private:
+		// call it when failed to write; the file must be opened for writing
+		void _restore_opened_file_to_utf8();
+
+		std::string text_backup_u8_;
 	};
 
 	class OutputFileBoxUnit : public AbstractIOFileBoxUnit

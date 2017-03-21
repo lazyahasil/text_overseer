@@ -4,6 +4,7 @@
 #include "rc_overseer.hpp"
 
 #include <codecvt>
+#include <thread>
 
 using namespace nana;
 using namespace text_overseer;
@@ -32,7 +33,7 @@ namespace gui
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 
-		lab_name_.caption(u8"<size=11>문제에서 제시한 출력</>");
+		lab_name_.caption(u8"<size=11>정답 출력</>");
 		lab_state_.caption(u8"텍스트 비교 기능 미완성");
 	}
 
@@ -62,9 +63,21 @@ namespace gui
 
 			for (auto i = 0; i < k_max_read_file_count; i++)
 			{
-				did_read_file = _read_file();
+				try
+				{
+					did_read_file = _read_file();
+				}
+				catch (std::exception& e)
+				{
+					ErrorHdr::instance().report(
+						ErrorHdr::priority::critical, 0,
+						std::string("Unknown error in the file read function - ") + e.what(),
+						wstr_to_utf8(file_.filename())
+					);
+				}
 				if (did_read_file)
 					break;
+				std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait 100ms
 			}
 
 			if (!did_read_file)
@@ -93,14 +106,17 @@ namespace gui
 		return file_is_changed;
 	}
 
-	bool AbstractIOFileBoxUnit::_read_file() noexcept
+	bool AbstractIOFileBoxUnit::_read_file()
 	{
-		std::lock_guard<std::mutex> g(file_mutex_);
+		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
+
+		if (!lock)
+			return false; // return if the file process is busy (fail trying to lock)
 
 		if (!file_.open(std::ios::in | std::ios::binary))
 		{
 			ErrorHdr::instance().report(
-				ErrorHdr::priority::info, 0, "can't open file to read", file_.filename()
+				ErrorHdr::priority::info, 0, "Cannot open the file to read", wstr_to_utf8(file_.filename())
 			);
 			return false;
 		}
@@ -114,7 +130,11 @@ namespace gui
 		}
 		catch (std::exception& e)
 		{
-			ErrorHdr::instance().report(ErrorHdr::priority::info, 0, e.what());
+			ErrorHdr::instance().report(
+				ErrorHdr::priority::info, 0,
+				std::string("Error while reading the file - ") + e.what(),
+				wstr_to_utf8(file_.filename())
+			);
 			file_.close();
 			return false;
 		}
@@ -163,7 +183,7 @@ namespace gui
 				ErrorHdr::instance().report(
 					ErrorHdr::priority::info,
 					ec.value(),
-					std::string("cannot check the last write time - ")
+					std::string("Cannot check the last write time - ")
 						+ charset(ec.message()).to_bytes(unicode::utf8),
 					text_overseer::wstr_to_utf8(file_.filename())
 				);
@@ -186,8 +206,15 @@ namespace gui
 	{
 		combo_locale_.events().selected([this](const nana::arg_combox& arg_combo) {
 			// update file locale
-			std::lock_guard<std::mutex> g(this->file_mutex_);
-			file_.locale(static_cast<FileIO::encoding>(arg_combo.widget.option()));
+			for (auto i = 0; i < k_max_try_to_update_widget; i++)
+			{
+				std::unique_lock<std::mutex> lock(this->file_mutex_, std::try_to_lock); // to avoid deadlock
+				if (lock)
+				{
+					file_.locale(static_cast<FileIO::encoding>(arg_combo.widget.option()));
+					break;
+				}
+			}
 		});
 	}
 
@@ -221,20 +248,54 @@ namespace gui
 		lab_name_.caption(u8"<size=11><bold>input</>.txt</>");
 
 		btn_save_.events().click([this](const arg_click&) {
-			this->_write_file();
+			if (!this->_write_file())
+			{
+				ErrorHdr::instance().report(
+					ErrorHdr::priority::critical, 0,
+					"The function of writing the file failed",
+					wstr_to_utf8(file_.filename())
+				);
+				// open a message box
+				msgbox mb(*this, u8"파일 쓰기 실패");
+				mb.icon(msgbox::icon_error) << u8"파일 쓰기에 실패했습니다.\n" << file_.filename();
+				mb.show();
+			}
 		});
+	}
+
+	bool InputFileBoxUnit::_read_file()
+	{
+		if (!AbstractIOFileBoxUnit::_read_file())
+			return false;
+		text_backup_u8_ = textbox_.caption();
+
+		// in texts from nana the newline escapes are used as \n\r(LF CR)
+		// => which causes a broken text file view in Windows; \r\n(CR LF) is normal
+		std::size_t pos = 0;
+		while ((pos = text_backup_u8_.find("\n\r", pos + 1)) != std::string::npos)
+		{
+			text_backup_u8_[pos] = L'\r';
+			text_backup_u8_[++pos] = L'\n';
+		}
+
+		return true;
 	}
 
 	bool InputFileBoxUnit::_write_file()
 	{
-		file_mutex_.lock(); // MUST unlock before return!!
+		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
 
-		if (!file_.open(std::ios::out | std::ios::binary))
+		if (!lock)
+			return false; // return if the file process is busy (fail trying to lock)
+
+		if (!file_.open(std::ios::out | std::ios::binary)) // MUST close and before return!!
 		{
 			ErrorHdr::instance().report(
-				ErrorHdr::priority::info, 0, "can't open file to write", file_.filename()
+				ErrorHdr::priority::critical, 0, "Cannot open the file to write", wstr_to_utf8(file_.filename())
 			);
-			file_mutex_.unlock();
+			msgbox mb(*this, u8"파일 쓰기 실패 (파일 열기)");
+			mb.icon(msgbox::icon_error) << u8"파일 쓰기 도중 파일 열기에 실패했습니다.";
+			mb.show();
 			return false;
 		}
 
@@ -242,12 +303,53 @@ namespace gui
 		auto locale = file_.locale();
 
 		if (locale == FileIO::encoding::unknown || locale == FileIO::encoding::system)
-			buf = wstr_to_mstr(textbox_.caption_wstring());
-		else // UTF-8 or UTF-16LE
-			buf = textbox_.caption();
+		{
+			auto caption = textbox_.caption_wstring();
+			try
+			{
+				buf = wstr_to_mstr(caption);
+			}
+			catch (std::range_error& e) // conversion fail on account of some unicode character
+			{
+				// substitute "\\n" for newline characters in caption string
+				std::size_t pos = 0;
+				while ((pos = caption.find(L"\n\r", pos + 1)) != std::string::npos)
+				{
+					caption[pos] = L'\\';
+					caption[++pos] = L'n';
+				}
 
-		// texts from nana use the newline escape as \n\r(LF CR)
-		// => which causes a broken text file in Windows; although \r\n(CR LF) is normal
+				// report character conversion error
+				ErrorHdr::instance().report(
+					ErrorHdr::priority::critical, 0,
+					std::string("Encoding conversion failed when writing the file (UTF-8 to ANSI) - ") + e.what(),
+					wstr_to_utf8(caption)
+				);
+
+				// restore the file from backup
+				_restore_opened_file_to_utf8();
+
+				// open a message box
+				msgbox mb(*this, u8"파일 쓰기 실패 (인코딩 오류)");
+				mb.icon(msgbox::icon_error);
+				mb << u8"파일 쓰기 도중 변환할 수 없는 유니코드 문자가 발견되었습니다.\n";
+				mb << u8"오류에 따른 파일 복구를 시도했습니다.";
+				mb.show();
+
+				// post-return
+				file_.close();
+				lock.unlock(); // manual unlock
+				combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
+				return false;
+			}
+		}
+		else // UTF-8 or UTF-16LE
+		{
+			buf = textbox_.caption();
+		}
+
+		// in texts from nana the newline escapes are used as \n\r(LF CR)
+		// => which causes a broken text file view in Windows; \r\n(CR LF) is normal
 		std::size_t pos = 0;
 		while ( (pos = buf.find("\n\r", pos + 1)) != std::string::npos )
 		{
@@ -270,20 +372,52 @@ namespace gui
 		}
 		catch (std::exception& e)
 		{
-			ErrorHdr::instance().report(ErrorHdr::priority::info, 0, e.what());
+			// report error
+			ErrorHdr::instance().report(
+				ErrorHdr::priority::critical, 0,
+				std::string("Error while writing the file - ") + e.what(), wstr_to_utf8(file_.filename())
+			);
+
+			// restore the file from backup
+			_restore_opened_file_to_utf8();
+
+			// open a message box
+			msgbox mb(*this, u8"파일 쓰기 실패");
+			mb.icon(msgbox::icon_error);
+			mb << u8"파일 쓰기 도중 직접적인 오류가 발생했습니다.\n";
+			mb << u8"오류에 따른 파일 복구를 시도했습니다.";
+			mb.show();
+
+			// post-return
 			file_.close();
-			file_mutex_.unlock();
+			lock.unlock(); // manual unlock
+			combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
 			return false;
 		}
 
+		// post-return
 		file_.close();
-		file_mutex_.unlock();
+		lock.unlock(); // manual unlock
 
 		// In mutex lock situation, it will cause nana gui exception(busy device).
-		// *** this program will terminate when _write_file() is noexcept and in mutex lock!! ***
 		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
 		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
 		return true;
+	}
+
+	void InputFileBoxUnit::_restore_opened_file_to_utf8()
+	{
+		if (!file_.is_open() || text_backup_u8_.empty())
+			return;
+		file_.locale(FileIO::encoding::utf8);
+		try
+		{
+			file_.write_all(text_backup_u8_.data(), text_backup_u8_.size());
+		}
+		catch (std::exception&)
+		{
+			// do nothing
+		}
 	}
 
 	OutputFileBoxUnit::OutputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
@@ -552,7 +686,7 @@ namespace gui
 			ErrorHdr::instance().report(
 				ErrorHdr::priority::info,
 				ec.value(),
-				std::string("cannot open the path while file search - ")
+				std::string("Cannot open the path while file search - ")
 					+ charset(ec.message()).to_bytes(unicode::utf8),
 				text_overseer::wstr_to_utf8(path_ec.path_str())
 			);
