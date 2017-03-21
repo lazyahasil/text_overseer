@@ -2,9 +2,9 @@
 
 #include <codecvt>
 
-namespace text_overseer
+namespace overseer_misc
 {
-	constexpr char* k_version_str = "0.2.4.1";
+	constexpr char* k_version_str = "0.2.4.2";
 
 	template <class Facet>
 	struct DeletableFacet : Facet

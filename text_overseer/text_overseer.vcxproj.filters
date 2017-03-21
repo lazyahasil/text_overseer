@@ -44,10 +44,10 @@
     <ClInclude Include="singleton.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="rc_overseer.hpp">
+    <ClInclude Include="overseer_rc.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="text_overseer.hpp">
+    <ClInclude Include="overseer_misc.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

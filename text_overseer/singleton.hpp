@@ -8,14 +8,15 @@ class Singleton
 {
 protected:
 	Singleton() = default;
+
+public:
 	Singleton(const Singleton<T>& src) = delete;
 	Singleton<T>& operator=(const Singleton<T>& rhs) = delete;
 
-public:
 	static T& instance()
 	{
 		std::call_once(once_flag_, [] {
-			instance_.reset(new T);
+			instance_ = std::make_unique<T>();
 		});
 		return *instance_.get();
 	}

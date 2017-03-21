@@ -3,7 +3,7 @@
 
 int main()
 {
-	gui::MainWindow window;
+	overseer_gui::MainWindow window;
 
 	window.show();
 

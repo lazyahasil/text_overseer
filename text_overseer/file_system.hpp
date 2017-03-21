@@ -12,6 +12,7 @@ namespace file_system
 	namespace filesys = boost::filesystem;
 
 	using IOFilePathPair = std::pair<std::wstring, std::wstring>;
+	using TimePointOfSys = std::chrono::time_point<std::chrono::system_clock/*, std::chrono::seconds*/>;
 
 	class FilePathErrorCode
 	{
@@ -30,8 +31,6 @@ namespace file_system
 		boost::system::error_code	ec_;
 	};
 
-	using TimePointOfSys = std::chrono::time_point<std::chrono::system_clock/*, std::chrono::seconds*/>;
-	
 	TimePointOfSys file_last_write_time(
 		const std::wstring&			file_path,
 		boost::system::error_code&	ec
@@ -205,7 +204,7 @@ namespace file_system
 		if ((counted == 0 && base_period == PeriodEnum::msecs)
 			|| (counted < 1000 && base_period == PeriodEnum::secs)
 			|| (counted < 1000 * 60 && base_period == PeriodEnum::mins)
-			|| (counted < 1000 * 3600 && !hours && base_period == PeriodEnum::hours)
+			|| (counted < 1000 * 3600 && base_period == PeriodEnum::hours)
 			|| (counted < 1000 * 86400 && base_period == PeriodEnum::days))
 			return periods.just_a_moment;
 		

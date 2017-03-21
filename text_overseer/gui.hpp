@@ -16,11 +16,11 @@
 #include <nana/gui/widgets/tabbar.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
-namespace gui
+namespace overseer_gui
 {
-	constexpr int k_max_read_file_count = 3;
-	constexpr int k_max_try_to_update_widget = 5;
-	constexpr int k_max_check_count_last_file_write = 5;
+	constexpr int k_max_count_read_file = 3;
+	constexpr int k_max_count_try_to_update_widget = 5;
+	constexpr int k_max_count_check_last_file_write = 5;
 
 	class AbstractBoxUnit : public nana::panel<false>
 	{
@@ -53,11 +53,15 @@ namespace gui
 		AbstractIOFileBoxUnit(nana::window wd);
 		virtual ~AbstractIOFileBoxUnit() = default;
 
+		virtual bool read_file();
 		virtual bool update_label_state() noexcept override;
 
-		bool is_same_file(const wchar_t* file_path) const noexcept
+		bool is_same_file(const wchar_t* path_str) const noexcept
 		{
-			return file_.filename_wstring().compare(file_path) == 0;
+			if (file_.filename_wstring().compare(path_str))
+				return true;
+			file_system::filesys::path own_path(file_.filename_wstring());
+			return own_path.compare(path_str) == 0;
 		}
 
 		template <class StringT>
@@ -66,25 +70,16 @@ namespace gui
 			file_.filename(std::forward<StringT>(file_path));
 		}
 
-		bool reload_file() noexcept
-		{
-			auto is_done = this->_read_file();
-			if (is_done)
-				combo_locale_.option(static_cast<std::size_t>(file_.locale()));
-			return is_done;
-		}
-
 		decltype(auto) last_write_time() const noexcept { return file_system::TimePointOfSys(); }
 
 	protected:
-		virtual bool _read_file();
 		virtual bool _write_file() = 0;
 
 		nana::button btn_reload_{ *this, u8"다시 읽기" };
 		nana::button btn_folder_{ *this };
 		nana::combox combo_locale_{ *this, u8"파일 인코딩" };
 
-		FileIO file_;
+		file_io::FileIO file_;
 		std::mutex file_mutex_;
 		file_system::TimePointOfSys last_write_time_;
 		bool last_write_time_is_vaild_{ false };
@@ -100,8 +95,9 @@ namespace gui
 	public:
 		InputFileBoxUnit(nana::window wd);
 
+		virtual bool read_file() override;
+
 	protected:
-		virtual bool _read_file() override;
 		virtual bool _write_file() override;
 
 		nana::button btn_save_{ *this, u8"저장" };
@@ -138,12 +134,12 @@ namespace gui
 			output_box_.register_file(output_filename);
 		}
 
-		bool reload_files()
+		void reload_files()
 		{
-			return input_box_.reload_file() || output_box_.reload_file();
+			input_box_.read_file() || output_box_.read_file();
 		}
 
-		decltype(auto) update_io_file_box_state()
+		bool update_io_file_box_state() noexcept
 		{
 			return input_box_.update_label_state() || output_box_.update_label_state();
 		}
@@ -169,6 +165,7 @@ namespace gui
 			std::wstring input_filename,
 			std::wstring output_filename
 		) noexcept;
+		void _easter_egg_logo() noexcept;
 		void _make_events() noexcept;
 		void _make_timer_io_tab_state() noexcept;
 		void _make_timer_tabbar_color_animation(std::size_t pos) noexcept;

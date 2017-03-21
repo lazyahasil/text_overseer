@@ -1,17 +1,18 @@
 ﻿#include "gui.hpp"
-#include "text_overseer.hpp"
+#include "overseer_misc.hpp"
 #include "error_handler.hpp"
-#include "rc_overseer.hpp"
+#include "overseer_rc.hpp"
 
 #include <codecvt>
-#include <thread>
 
+using namespace error_handler;
+using namespace file_io;
 using namespace nana;
-using namespace text_overseer;
+using namespace overseer_misc;
 
-namespace gui
+namespace overseer_gui
 {
-	AbstractBoxUnit::AbstractBoxUnit(nana::window wd) : nana::panel<false>(wd)
+	AbstractBoxUnit::AbstractBoxUnit(window wd) : panel<false>(wd)
 	{
 		lab_name_.format(true);
 		lab_name_.text_align(align::left, align_v::center);
@@ -37,7 +38,7 @@ namespace gui
 		lab_state_.caption(u8"텍스트 비교 기능 미완성");
 	}
 
-	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(nana::window wd) : AbstractBoxUnit(wd)
+	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
 	{
 		// combo box order relys on FileIO::encoding
 		combo_locale_.push_back(u8"자동");
@@ -61,11 +62,11 @@ namespace gui
 		{
 			bool did_read_file = false;
 
-			for (auto i = 0; i < k_max_read_file_count; i++)
+			for (auto i = 0; i < k_max_count_read_file; i++)
 			{
 				try
 				{
-					did_read_file = _read_file();
+					did_read_file = read_file();
 				}
 				catch (std::exception& e)
 				{
@@ -77,7 +78,6 @@ namespace gui
 				}
 				if (did_read_file)
 					break;
-				std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait 100ms
 			}
 
 			if (!did_read_file)
@@ -85,8 +85,6 @@ namespace gui
 				lab_state_.caption(u8"파일을 열지 못했습니다.");
 				return false;
 			}
-			combo_locale_.option(static_cast<std::size_t>(file_.locale()));
-				
 		}
 		else if (!last_write_time_is_vaild_)
 		{
@@ -106,12 +104,14 @@ namespace gui
 		return file_is_changed;
 	}
 
-	bool AbstractIOFileBoxUnit::_read_file()
+	bool AbstractIOFileBoxUnit::read_file()
 	{
 		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
 
 		if (!lock)
 			return false; // return if the file process is busy (fail trying to lock)
+
+		FileIOClosingGuard file_closer(file_);
 
 		if (!file_.open(std::ios::in | std::ios::binary))
 		{
@@ -135,7 +135,6 @@ namespace gui
 				std::string("Error while reading the file - ") + e.what(),
 				wstr_to_utf8(file_.filename())
 			);
-			file_.close();
 			return false;
 		}
 
@@ -148,7 +147,11 @@ namespace gui
 		else // UTF-16LE
 			textbox_.caption(charset(str, unicode::utf16).to_bytes(unicode::utf8));
 
-		file_.close();
+		lock.unlock(); // manual unlock before nana::combox::option()
+
+		// In mutex lock situation, it will cause nana gui exception(busy device).
+		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
+		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
 		return true;
 	}
 
@@ -160,7 +163,7 @@ namespace gui
 		boost::system::error_code ec;
 		file_system::TimePointOfSys time_gotton;
 
-		for (auto i = 0; i < k_max_check_count_last_file_write; i++)
+		for (auto i = 0; i < k_max_count_check_last_file_write; i++)
 		{
 			time_gotton = file_system::file_last_write_time(file_.filename(), ec);
 			if (!ec)
@@ -185,7 +188,7 @@ namespace gui
 					ec.value(),
 					std::string("Cannot check the last write time - ")
 						+ charset(ec.message()).to_bytes(unicode::utf8),
-					text_overseer::wstr_to_utf8(file_.filename())
+					wstr_to_utf8(file_.filename())
 				);
 				last_write_time_is_vaild_ = false;
 				btn_reload_.enabled(false);
@@ -198,15 +201,15 @@ namespace gui
 	void AbstractIOFileBoxUnit::_make_event_btn_reload() noexcept
 	{
 		btn_reload_.events().click([this](const arg_click&) {
-			reload_file();
+			this->read_file();
 		});
 	}
 
 	void AbstractIOFileBoxUnit::_make_event_combo_locale() noexcept
 	{
-		combo_locale_.events().selected([this](const nana::arg_combox& arg_combo) {
+		combo_locale_.events().selected([this](const arg_combox& arg_combo) {
 			// update file locale
-			for (auto i = 0; i < k_max_try_to_update_widget; i++)
+			for (auto i = 0; i < k_max_count_try_to_update_widget; i++)
 			{
 				std::unique_lock<std::mutex> lock(this->file_mutex_, std::try_to_lock); // to avoid deadlock
 				if (lock)
@@ -218,7 +221,7 @@ namespace gui
 		});
 	}
 
-	InputFileBoxUnit::InputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
+	InputFileBoxUnit::InputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
 	{
 		place_.div(
 			"<vert "
@@ -263,9 +266,9 @@ namespace gui
 		});
 	}
 
-	bool InputFileBoxUnit::_read_file()
+	bool InputFileBoxUnit::read_file()
 	{
-		if (!AbstractIOFileBoxUnit::_read_file())
+		if (!AbstractIOFileBoxUnit::read_file())
 			return false;
 		text_backup_u8_ = textbox_.caption();
 
@@ -288,7 +291,9 @@ namespace gui
 		if (!lock)
 			return false; // return if the file process is busy (fail trying to lock)
 
-		if (!file_.open(std::ios::out | std::ios::binary)) // MUST close and before return!!
+		FileIOClosingGuard file_closer(file_);
+
+		if (!file_.open(std::ios::out | std::ios::binary))
 		{
 			ErrorHdr::instance().report(
 				ErrorHdr::priority::critical, 0, "Cannot open the file to write", wstr_to_utf8(file_.filename())
@@ -336,9 +341,8 @@ namespace gui
 				mb << u8"오류에 따른 파일 복구를 시도했습니다.";
 				mb.show();
 
-				// post-return
-				file_.close();
-				lock.unlock(); // manual unlock
+				lock.unlock(); // manual unlock before nana::combox::option()
+				// at the end of this function, there is a detailed explanation for the statement below
 				combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
 				return false;
 			}
@@ -388,15 +392,11 @@ namespace gui
 			mb << u8"오류에 따른 파일 복구를 시도했습니다.";
 			mb.show();
 
-			// post-return
-			file_.close();
-			lock.unlock(); // manual unlock
+			lock.unlock(); // manual unlock before nana::combox::option()
 			combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
 			return false;
 		}
 
-		// post-return
-		file_.close();
 		lock.unlock(); // manual unlock
 
 		// In mutex lock situation, it will cause nana gui exception(busy device).
@@ -420,7 +420,7 @@ namespace gui
 		}
 	}
 
-	OutputFileBoxUnit::OutputFileBoxUnit(nana::window wd) : AbstractIOFileBoxUnit(wd)
+	OutputFileBoxUnit::OutputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
 	{
 		place_.div(
 			"<vert "
@@ -502,9 +502,8 @@ namespace gui
 
 		// widget initiation - label
 		paint::image img_logo;
-		img_logo.open(k_overseer_bmp, k_overseer_bmp_size);
+		img_logo.open(overseer_rc::k_overseer_bmp, overseer_rc::k_overseer_bmp_size);
 		pic_logo_.load(img_logo);
-		pic_logo_.transparent(true);
 		pic_logo_.stretchable(false);
 		pic_logo_.align(align::center, align_v::center);
 
@@ -526,9 +525,8 @@ namespace gui
 		std::wstring output_filename
 	) noexcept
 	{
-		std::shared_ptr<IOFilesTabPage> page = std::make_shared<IOFilesTabPage>(*this);
+		auto page = std::make_shared<IOFilesTabPage>(*this);
 		page->register_files(input_filename, output_filename);
-		//->update_io_file_box_state();
 		place_["tab_frame"].fasten(*page);
 		tabbar_.push_back(std::move(tab_name_u8));
 		auto pos = io_tab_pages_.size();
@@ -537,65 +535,63 @@ namespace gui
 		io_tab_pages_.push_back(std::move(page));
 	}
 
+	void MainWindow::_easter_egg_logo() noexcept
+	{
+		static bool was_called = false;
+
+		if (!was_called) // first call
+		{
+			std::string str;
+
+			// change lab_title_
+			str = this->lab_title_.caption();
+			str.replace(str.find(u8"감시기"), sizeof(u8"감시기") - 1, u8"<color=0x800080>감시기</>");
+			this->lab_title_.caption(str);
+
+			// change lab_welcome_
+			str = this->lab_welcome_.caption();
+			str.replace(str.find(u8"감시"), sizeof(u8"감시") - 1, u8"<bold color=0x800080>탐지</>");
+			this->lab_welcome_.caption(str);
+
+			// set flag to get this doing once
+			was_called = true;
+		}
+		else // second call
+		{
+			// start debugging to a log file
+			if (ErrorHdr::instance().is_started())
+				return;
+
+			msgbox mb(*this, u8"디버깅 시작", msgbox::yes_no);
+			mb.icon(msgbox::icon_question) << u8"로그 파일에 디버깅 정보를 기록하시겠습니까?";
+			if (mb() == msgbox::pick_yes)
+			{
+				// modify the form's title
+				this->caption(this->caption() + " (debug mode)");
+
+				// add a border to logo picture
+				drawing dw(*this);
+				dw.draw([this](paint::graphics& graph) {
+					point pos = this->pic_logo_.pos();
+					graph.rectangle(
+						rectangle(pos, nana::size{ 68, 68 }), false, color_rgb(0x800080));
+					graph.rectangle(
+						rectangle(pos + point(1, 1), nana::size{ 66, 66 }), false, color_rgb(0x800080));
+				});
+				dw.update();
+				//this->pic_logo_.bgcolor(color_rgb(0x800080)); // bgcolor() doesn't work here
+
+				// start debugging
+				ErrorHdr::instance().start();
+			}
+		}
+	}
+
 	void MainWindow::_make_events() noexcept
 	{
 		// pic_logo_ is clicked => modify lab_title_ caption and start debugging
 		pic_logo_.events().click([this](const arg_click&) {
-
-			static bool was_called = false;
-			if (!was_called) // first call
-			{
-				std::string str;
-
-				// change lab_title_
-				str = this->lab_title_.caption();
-				str.replace(
-					str.find(u8"감시기"),
-					sizeof(u8"감시기") - 1,
-					u8"<color=0x800080>감시기</>"
-				);
-				this->lab_title_.caption(str);
-
-				// change lab_welcome_
-				str = this->lab_welcome_.caption();
-				str.replace(
-					str.find(u8"감시"),
-					sizeof(u8"감시") - 1,
-					u8"<bold color=0x800080>탐지</>"
-				);
-				this->lab_welcome_.caption(str);
-
-				// set flag to get this doing once
-				was_called = true;
-			}
-			else // second call
-			{
-				// start debugging to a log file
-				if (!ErrorHdr::instance().is_started())
-				{
-					msgbox mb(*this, u8"디버깅 시작", msgbox::yes_no);
-					mb.icon(msgbox::icon_question) << u8"로그 파일에 디버깅 정보를 기록하시겠습니까?";
-					if (mb() == msgbox::pick_yes)
-					{
-						// modify the form's title
-						this->caption(this->caption() + " (debug mode)");
-
-						// add a border to logo picture
-						drawing dw(*this);
-						dw.draw([this](paint::graphics& graph) {
-							point pos = this->pic_logo_.pos();
-							graph.rectangle(
-								rectangle(pos, nana::size(68, 68)), false, color_rgb(0x800080));
-							graph.rectangle(
-								rectangle(pos + point(1, 1), nana::size(66, 66)), false, color_rgb(0x800080));
-						});
-						dw.update();
-						//this->pic_logo_.bgcolor(color_rgb(0x800080)); // bgcolor() doesn't work here
-						ErrorHdr::instance().start();
-					}
-				}
-			}
-
+			this->_easter_egg_logo();
 		});
 
 		// btn_refresh_ is clicked => _search_io_files()
@@ -639,9 +635,9 @@ namespace gui
 		if (timers_tabbar_color_animation_[pos].timer_ptr)
 			return;
 
-		auto timer_tca = std::make_shared<timer>(); // tca = tabbar_color_animation
-		timer_tca->interval(20);
-		timer_tca->elapse([this, index = pos, interval = timer_tca->interval(), &func_color_level]{
+		auto a_timer = std::make_shared<timer>(); // tca = tabbar_color_animation
+		a_timer->interval(20);
+		a_timer->elapse([this, index = pos, interval = a_timer->interval(), &func_color_level]{
 			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
 			this->tabbar_.tab_bgcolor(
 				index,
@@ -653,7 +649,7 @@ namespace gui
 		});
 
 		auto& timer_data = timers_tabbar_color_animation_[pos];
-		timer_data.timer_ptr = std::move(timer_tca);
+		timer_data.timer_ptr = std::move(a_timer);
 		timer_data.elapsed_time = 0U;
 
 		timer_data.timer_ptr->start();
@@ -688,7 +684,7 @@ namespace gui
 				ec.value(),
 				std::string("Cannot open the path while file search - ")
 					+ charset(ec.message()).to_bytes(unicode::utf8),
-				text_overseer::wstr_to_utf8(path_ec.path_str())
+				wstr_to_utf8(path_ec.path_str())
 			);
 		}
 
