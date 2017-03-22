@@ -1,11 +1,16 @@
 ﻿#pragma once
 
+#include "overseer_misc.hpp"
+
 #include <fstream>
 
 namespace file_io
 {
 	namespace detail
 	{
+		// bytes size limit when checking that the file is UTF-8 without BOM
+		constexpr std::size_t k_max_size_check_utf8 = 0x400U;
+
 		namespace bom // Byte Order Mark
 		{
 			constexpr unsigned char k_u8[3]{ 0xEF, 0xBB, 0xBF };
@@ -32,10 +37,11 @@ namespace file_io
 	public:
 		enum class encoding
 		{
-			unknown,
-			system,		// ANSI(system locale); can be treated as "UTF-8 without BOM"
-			utf8,		// UTF-8 with BOM
-			utf16_le	// UTF-16LE
+			unknown,		// neutral or fail => can be automatically translated to ANSI
+			system,			// ANSI(system locale)
+			utf8,			// UTF-8 with BOM
+			utf8_no_bom,	// UTF-8 without BOM
+			utf16_le		// UTF-16LE
 		};
 
 		FileIO() = default;
@@ -81,9 +87,9 @@ namespace file_io
 				else if (sizeof(buf[0]) != 1) // buffer type size != 1, 2
 					throw std::runtime_error("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
 			}
-			std::streamoff bom_length = file_.tellg();
-			auto size = static_cast<std::size_t>(stream_size() - bom_length); // string length
-			auto sequence_length = do_write_16_bit ? (size / 2 + size % 2) : size;
+			auto bom_length = file_.tellg();
+			auto size = static_cast<std::size_t>(stream_size() - bom_length); // byte size
+			auto sequence_length = do_write_16_bit ? (size / 2 + size % 2) : size; // length of the buffer sequence
 			if (buf_size < size)
 			{
 				if (is_resizable)
@@ -93,8 +99,13 @@ namespace file_io
 			}
 			file_.seekg(bom_length, std::ios::beg);
 			file_.read(reinterpret_cast<unsigned char*>(&buf[0]), size);
+			// when encoding is system, check if it's UTF-8 without BOM, within certain bytes of string
+			if (file_locale_ == encoding::system)
+			{
+				if (overseer_misc::utf8_check_vaild(buf, k_max_size_check_utf8))
+					file_locale_ = encoding::utf8_no_bom;
+			}
 			return sequence_length;
-			return 0U;
 		}
 
 		std::string read_all();
@@ -135,7 +146,7 @@ namespace file_io
 			const std::basic_string<CharT>& newline
 		)
 		{
-			if (!write_some(buf, byte_length) || newline.empty())
+			if (!write_some(buf, byte_length))
 				return false;
 			file_.write(reinterpret_cast<const unsigned char*>(newline.data()), newline.size());
 			return true;
@@ -174,14 +185,23 @@ namespace file_io
 
 		~FileIOClosingGuard()
 		{
-			if (file_io_)
+			if (file_io_ && !is_closed_)
 				file_io_->close();
 		}
 
 		FileIOClosingGuard(const FileIOClosingGuard& src) = delete;
 		FileIOClosingGuard& operator=(const FileIOClosingGuard& rhs) = delete;
 
+		void close_safe() noexcept
+		{
+			if (is_closed_)
+				return;
+			file_io_->close();
+			is_closed_ = true;
+		}
+
 	private:
 		FileIO* file_io_{ nullptr };
+		bool is_closed_{ false };
 	};
 }

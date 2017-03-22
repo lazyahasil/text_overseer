@@ -54,7 +54,7 @@ namespace file_io
 			}
 		}
 		file_.seekg(0, std::ios::beg);
-		return encoding::system;
+		return encoding::system; // can be treated as "UTF-8 without BOM"
 	}
 
 	bool FileIO::write_bom()
@@ -72,12 +72,8 @@ namespace file_io
 	bool FileIO::update_locale_by_read_bom()
 	{
 		auto locale = read_bom();
-		if (locale == encoding::unknown)
-		{
-			// UTF-8 without BOM detection needed (not implemented yet)
-			file_locale_ = encoding::system;
+		if (locale == encoding::unknown) // failed
 			return false;
-		}
 		file_locale_ = locale;
 		return true;
 	}

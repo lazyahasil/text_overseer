@@ -44,6 +44,7 @@ namespace overseer_gui
 		combo_locale_.push_back(u8"자동");
 		combo_locale_.push_back("ANSI");
 		combo_locale_.push_back("UTF-8");
+		combo_locale_.push_back(u8"서명 없는 UTF-8");
 		combo_locale_.push_back("UTF-16LE");
 		
 		// widgets
@@ -140,24 +141,25 @@ namespace overseer_gui
 
 		locale = file_.locale();
 
-		if (locale == FileIO::encoding::system)
+		if (locale == FileIO::encoding::system) // ANSI
 			textbox_.caption(charset(str).to_bytes(unicode::utf8));
-		else if (locale == FileIO::encoding::utf8)
-			textbox_.caption(str);
-		else // UTF-16LE
+		else if (locale == FileIO::encoding::utf16_le) // UTF-16LE
 			textbox_.caption(charset(str, unicode::utf16).to_bytes(unicode::utf8));
+		else // UTF-8
+			textbox_.caption(str);
 
+		file_closer.close_safe(); // manual file close before unlock
 		lock.unlock(); // manual unlock before nana::combox::option()
 
 		// In mutex lock situation, it will cause nana gui exception(busy device).
 		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
-		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
+		combo_locale_.option(static_cast<std::size_t>(locale));
 		return true;
 	}
 
 	bool AbstractIOFileBoxUnit::_check_last_write_time() noexcept
 	{
-		if (*file_.filename() == '\0')
+		if (file_.filename_wstring().empty())
 			return false;
 
 		boost::system::error_code ec;
@@ -235,9 +237,9 @@ namespace overseer_gui
 			"  <weight=42 margin=[3,0,0,0]"
 			"    <vert margin=[0,3,0,0]"
 			"      <margin=[0,0,3,0] lab_state>"
-			"      < <> <weight=100 combo_locale> >"
+			"      < <> <weight=110 combo_locale> >"
 			"    >"
-			"    <weight=80 btn_save>"
+			"    <weight=70 btn_save>"
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
@@ -334,16 +336,18 @@ namespace overseer_gui
 				// restore the file from backup
 				_restore_opened_file_to_utf8();
 
+				file_closer.close_safe(); // manual file close before unlock
+				lock.unlock(); // manual unlock before nana::combox::option()
+				// at the end of this function, there is a detailed explanation for the statement below
+				combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
+
 				// open a message box
 				msgbox mb(*this, u8"파일 쓰기 실패 (인코딩 오류)");
 				mb.icon(msgbox::icon_error);
 				mb << u8"파일 쓰기 도중 변환할 수 없는 유니코드 문자가 발견되었습니다.\n";
-				mb << u8"오류에 따른 파일 복구를 시도했습니다.";
+				mb << u8"오류에 따른 파일 복구를 시도했습니다. (UTF-8)";
 				mb.show();
 
-				lock.unlock(); // manual unlock before nana::combox::option()
-				// at the end of this function, there is a detailed explanation for the statement below
-				combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
 				return false;
 			}
 		}
@@ -385,23 +389,26 @@ namespace overseer_gui
 			// restore the file from backup
 			_restore_opened_file_to_utf8();
 
+			file_closer.close_safe(); // manual file close before unlock
+			lock.unlock(); // manual unlock before nana::combox::option()
+			combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
+
 			// open a message box
 			msgbox mb(*this, u8"파일 쓰기 실패");
 			mb.icon(msgbox::icon_error);
 			mb << u8"파일 쓰기 도중 직접적인 오류가 발생했습니다.\n";
-			mb << u8"오류에 따른 파일 복구를 시도했습니다.";
+			mb << u8"오류에 따른 파일 복구를 시도했습니다. (UTF-8)";
 			mb.show();
 
-			lock.unlock(); // manual unlock before nana::combox::option()
-			combo_locale_.option(std::underlying_type_t<FileIO::encoding>(FileIO::encoding::utf8));
 			return false;
 		}
 
-		lock.unlock(); // manual unlock
+		file_closer.close_safe(); // manual file close before unlock
+		lock.unlock(); // manual unlock before nana::combox::option()
 
 		// In mutex lock situation, it will cause nana gui exception(busy device).
 		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
-		combo_locale_.option(std::underlying_type_t<FileIO::encoding>(locale));
+		combo_locale_.option(static_cast<std::size_t>(locale));
 		return true;
 	}
 
@@ -434,9 +441,9 @@ namespace overseer_gui
 			"  <weight=42 margin=[3,0,0,0]"
 			"    <vert margin=[0,3,0,0]"
 			"      <margin=[0,0,3,0] lab_state>"
-			"      < <> <weight=100 combo_locale> >"
+			"      < <> <weight=110 combo_locale> >"
 			"    >"
-			"    <weight=80>"
+			"    <weight=70>"
 			"  >"
 			">");
 		place_["lab_name"] << lab_name_;
@@ -635,7 +642,7 @@ namespace overseer_gui
 		if (timers_tabbar_color_animation_[pos].timer_ptr)
 			return;
 
-		auto a_timer = std::make_shared<timer>(); // tca = tabbar_color_animation
+		auto a_timer = std::make_shared<timer>();
 		a_timer->interval(20);
 		a_timer->elapse([this, index = pos, interval = a_timer->interval(), &func_color_level]{
 			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
@@ -650,7 +657,7 @@ namespace overseer_gui
 
 		auto& timer_data = timers_tabbar_color_animation_[pos];
 		timer_data.timer_ptr = std::move(a_timer);
-		timer_data.elapsed_time = 0U;
+		timer_data.elapsed_time = 0;
 
 		timer_data.timer_ptr->start();
 	}
@@ -669,7 +676,7 @@ namespace overseer_gui
 		auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
 		timer_io_tab_state_.stop();
 
-		for (std::size_t i = 0U; i < timers_tabbar_color_animation_.size(); i++)
+		for (std::size_t i = 0; i < timers_tabbar_color_animation_.size(); i++)
 			_remove_timer_tabbar_color_animation(i);
 
 		auto pair_file_pairs_and_path_ecs = file_system::search_input_output_files(L"input.txt", L"output.txt");
@@ -731,7 +738,7 @@ namespace overseer_gui
 		if (timer_io_tab_state_was_going)
 			timer_io_tab_state_.start();
 
-		for (std::size_t i = 0U; i < io_tab_pages_.size(); i++)
+		for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 			_make_timer_tabbar_color_animation(i);
 	}
 }
