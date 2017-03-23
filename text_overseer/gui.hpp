@@ -11,6 +11,7 @@
 #include <nana/gui/widgets/combox.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/label.hpp>
+#include <nana/gui/widgets/menu.hpp>
 #include <nana/gui/widgets/panel.hpp>
 #include <nana/gui/widgets/picture.hpp>
 #include <nana/gui/widgets/tabbar.hpp>
@@ -31,10 +32,13 @@ namespace overseer_gui
 		virtual bool update_label_state() noexcept = 0;
 
 	protected:
+		virtual void _make_textbox_popup_menu();
+
 		nana::place place_{ *this };
 		nana::label lab_name_{ *this };
 		nana::label lab_state_{ *this, u8"상태" };
 		nana::textbox textbox_{ *this };
+		nana::menu popup_menu_;
 	};
 
 	class TextBoxUnit : public AbstractBoxUnit
@@ -56,12 +60,13 @@ namespace overseer_gui
 		virtual bool read_file();
 		virtual bool update_label_state() noexcept override;
 
-		bool is_same_file(const wchar_t* path_str) const noexcept
+		bool is_same_file(const std::wstring& path_str) const noexcept
 		{
-			if (file_.filename_wstring().compare(path_str))
+			if (file_.filename_wstring() == path_str)
 				return true;
 			file_system::filesys::path own_path(file_.filename_wstring());
-			return own_path.compare(path_str) == 0;
+			file_system::filesys::path param_path(path_str);
+			return own_path.compare(param_path) == 0;
 		}
 
 		template <class StringT>
@@ -69,8 +74,6 @@ namespace overseer_gui
 		{
 			file_.filename(std::forward<StringT>(file_path));
 		}
-
-		decltype(auto) last_write_time() const noexcept { return file_system::TimePointOfSys(); }
 
 	protected:
 		virtual bool _write_file() = 0;
@@ -123,7 +126,7 @@ namespace overseer_gui
 	public:
 		IOFilesTabPage(nana::window wd);
 
-		bool is_same_files(const wchar_t* input_filename, const wchar_t* output_filename) const noexcept
+		bool is_same_files(const std::wstring& input_filename, const std::wstring& output_filename) const noexcept
 		{
 			return input_box_.is_same_file(input_filename) && output_box_.is_same_file(output_filename);
 		}

@@ -4,6 +4,7 @@
 #include "overseer_rc.hpp"
 
 #include <codecvt>
+#include <nana/gui/state_cursor.hpp>
 
 using namespace error_handler;
 using namespace file_io;
@@ -19,6 +20,36 @@ namespace overseer_gui
 
 		lab_name_.format(true);
 		lab_name_.text_align(align::left, align_v::center);
+
+		_make_textbox_popup_menu();
+	}
+
+	void AbstractBoxUnit::_make_textbox_popup_menu()
+	{
+		popup_menu_.append(u8"복사 (Ctrl+C)", [this](menu::item_proxy& ip) {
+			if (this->textbox_.selected())
+				this->textbox_.copy();
+		});
+
+		popup_menu_.append(u8"붙여넣기 (Ctrl+V)", [this](menu::item_proxy& ip) {
+			this->textbox_.focus();
+			this->textbox_.paste();
+		});
+
+		popup_menu_.append_splitter();
+
+		popup_menu_.append(u8"모두 선택 (Ctrl+A)", [this](menu::item_proxy& ip) {
+			this->textbox_.focus();
+			this->textbox_.select(true);
+		});
+
+		//textbox_.events().mouse_down(menu_popuper(popup_menu_));
+		textbox_.events().mouse_down([this](const arg_mouse& arg) {
+			// have to change the mouse cursor
+
+			// call menu_popuper
+			menu_popuper(this->popup_menu_)(arg);
+		});
 	}
 
 	TextBoxUnit::TextBoxUnit(window wd) : AbstractBoxUnit(wd)
@@ -112,8 +143,6 @@ namespace overseer_gui
 		if (!lock)
 			return false; // return if the file process is busy (fail trying to lock)
 
-		FileIOClosingGuard file_closer(file_);
-
 		if (!file_.open(std::ios::in | std::ios::binary))
 		{
 			ErrorHdr::instance().report(
@@ -122,8 +151,8 @@ namespace overseer_gui
 			return false;
 		}
 
+		FileIOClosingGuard file_closer(file_);
 		std::string str;
-		FileIO::encoding locale;
 
 		try
 		{
@@ -139,7 +168,7 @@ namespace overseer_gui
 			return false;
 		}
 
-		locale = file_.locale();
+		auto locale = file_.locale();
 
 		if (locale == FileIO::encoding::system) // ANSI
 			textbox_.caption(charset(str).to_bytes(unicode::utf8));
@@ -270,8 +299,9 @@ namespace overseer_gui
 
 	bool InputFileBoxUnit::read_file()
 	{
-		if (!AbstractIOFileBoxUnit::read_file())
+		if (!AbstractIOFileBoxUnit::read_file()) // call its parent class's method
 			return false;
+
 		text_backup_u8_ = textbox_.caption();
 
 		// in texts from nana the newline escapes are used as \n\r(LF CR)
@@ -293,8 +323,6 @@ namespace overseer_gui
 		if (!lock)
 			return false; // return if the file process is busy (fail trying to lock)
 
-		FileIOClosingGuard file_closer(file_);
-
 		if (!file_.open(std::ios::out | std::ios::binary))
 		{
 			ErrorHdr::instance().report(
@@ -305,6 +333,8 @@ namespace overseer_gui
 			mb.show();
 			return false;
 		}
+
+		FileIOClosingGuard file_closer(file_);
 
 		std::string buf;
 		auto locale = file_.locale();
@@ -369,7 +399,7 @@ namespace overseer_gui
 
 		// charset(u8_str, unicode::utf8).to_bytes(unicode::utf16) is not good; better use std::wstring_convert
 		if (locale == FileIO::encoding::utf16_le) // UTF-16LE
-			u16_buf = utf16_to_utf8(buf);
+			u16_buf = utf8_to_utf16(buf);
 		
 		try
 		{
@@ -429,6 +459,7 @@ namespace overseer_gui
 
 	OutputFileBoxUnit::OutputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
 	{
+		// div
 		place_.div(
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
@@ -453,8 +484,14 @@ namespace overseer_gui
 		place_["lab_state"] << lab_state_;
 		place_["combo_locale"] << combo_locale_;
 
+		// widget initiation - label
 		lab_name_.caption(u8"<size=11><bold>output</>.txt</>");
+		
+		// widget initiation - textbox
+		textbox_.editable(false);
+		textbox_.enable_caret();
 
+		// widget initiation - combox
 		combo_locale_.enabled(false);
 	}
 
@@ -507,11 +544,12 @@ namespace overseer_gui
 		place_["tabbar"] << tabbar_;
 		place_.collocate();
 
-		// widget initiation - label
+		// widget initiation - picture
 		paint::image img_logo;
 		img_logo.open(overseer_rc::k_overseer_bmp, overseer_rc::k_overseer_bmp_size);
 		pic_logo_.load(img_logo);
 		pic_logo_.stretchable(false);
+		pic_logo_.transparent(true); // without setting this, the border line for easter egg won't show
 		pic_logo_.align(align::center, align_v::center);
 
 		// widget initiation - label
@@ -551,14 +589,14 @@ namespace overseer_gui
 			std::string str;
 
 			// change lab_title_
-			str = this->lab_title_.caption();
+			str = lab_title_.caption();
 			str.replace(str.find(u8"감시기"), sizeof(u8"감시기") - 1, u8"<color=0x800080>감시기</>");
-			this->lab_title_.caption(str);
+			lab_title_.caption(str);
 
 			// change lab_welcome_
-			str = this->lab_welcome_.caption();
+			str = lab_welcome_.caption();
 			str.replace(str.find(u8"감시"), sizeof(u8"감시") - 1, u8"<bold color=0x800080>탐지</>");
-			this->lab_welcome_.caption(str);
+			lab_welcome_.caption(str);
 
 			// set flag to get this doing once
 			was_called = true;
@@ -577,17 +615,16 @@ namespace overseer_gui
 				this->caption(this->caption() + " (debug mode)");
 
 				// add a border to logo picture
+				// bgcolor() doesn't work here (for example: pic_logo_.bgcolor(color_rgb(0x800080));)
 				drawing dw(*this);
-				dw.draw([this](paint::graphics& graph) {
-					point pos = this->pic_logo_.pos();
+				dw.draw([pos = this->pic_logo_.pos()](paint::graphics& graph) {
 					graph.rectangle(
 						rectangle(pos, nana::size{ 68, 68 }), false, color_rgb(0x800080));
 					graph.rectangle(
-						rectangle(pos + point(1, 1), nana::size{ 66, 66 }), false, color_rgb(0x800080));
+						rectangle(pos + point{ 1, 1 }, nana::size{ 66, 66 }), false, color_rgb(0x800080));
 				});
 				dw.update();
-				//this->pic_logo_.bgcolor(color_rgb(0x800080)); // bgcolor() doesn't work here
-
+				
 				// start debugging
 				ErrorHdr::instance().start();
 			}
@@ -630,21 +667,21 @@ namespace overseer_gui
 
 	void MainWindow::_make_timer_tabbar_color_animation(std::size_t pos) noexcept
 	{
-		const auto func_color_level = [](unsigned int time) -> double {
-			if (time >= 400 && time <= 1600)
-				return 1.0 - static_cast<double>(time - 400) / 1200;
-			return 1.0;
-		};
-
 		if (timers_tabbar_color_animation_.size() <= pos)
 			timers_tabbar_color_animation_.resize(pos + 1);
 
 		if (timers_tabbar_color_animation_[pos].timer_ptr)
 			return;
 
+		const auto func_color_level = [](unsigned int time) -> double {
+			if (time >= 400 && time <= 1600)
+				return 1.0 - static_cast<double>(time - 400) / 1200;
+			return 1.0;
+		};
+
 		auto a_timer = std::make_shared<timer>();
 		a_timer->interval(20);
-		a_timer->elapse([this, index = pos, interval = a_timer->interval(), &func_color_level]{
+		a_timer->elapse([this, index = pos, interval = a_timer->interval(), &func_color_level] {
 			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
 			this->tabbar_.tab_bgcolor(
 				index,
@@ -658,7 +695,6 @@ namespace overseer_gui
 		auto& timer_data = timers_tabbar_color_animation_[pos];
 		timer_data.timer_ptr = std::move(a_timer);
 		timer_data.elapsed_time = 0;
-
 		timer_data.timer_ptr->start();
 	}
 
@@ -673,9 +709,11 @@ namespace overseer_gui
 
 	void MainWindow::_search_io_files() noexcept
 	{
+		// preserve the condition of timer_io_tab_state_
 		auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
 		timer_io_tab_state_.stop();
 
+		// _remove_timer_tabbar_color_animation() for all timers_tabbar_color_animation_
 		for (std::size_t i = 0; i < timers_tabbar_color_animation_.size(); i++)
 			_remove_timer_tabbar_color_animation(i);
 
@@ -683,6 +721,7 @@ namespace overseer_gui
 		auto file_pairs = std::move(pair_file_pairs_and_path_ecs.first);
 		const auto path_ecs = std::move(pair_file_pairs_and_path_ecs.second);
 
+		// check error codes from file_system::search_input_output_files()
 		for (const auto& path_ec : path_ecs)
 		{
 			const auto ec = path_ec.error_code();
@@ -695,12 +734,13 @@ namespace overseer_gui
 			);
 		}
 
+		// check if tab pages found already exists
 		for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 		{
 			auto are_already_in_tabs = false;
 			for (std::size_t j = 0; j < file_pairs.size(); j++)
 			{
-				if (io_tab_pages_[i]->is_same_files(file_pairs[j].first.c_str(), file_pairs[j].second.c_str()))
+				if (io_tab_pages_[i]->is_same_files(file_pairs[j].first, file_pairs[j].second))
 				{
 					are_already_in_tabs = true;
 					file_pairs.erase(file_pairs.begin() + j);
@@ -715,10 +755,12 @@ namespace overseer_gui
 			else
 			{
 				tabbar_.erase(i); // it will change current activated tab; but can't manage to handle this
+				place_.erase(*io_tab_pages_[i]);
 				io_tab_pages_.erase(io_tab_pages_.begin() + i--);
 			}
 		}
 
+		// get the folder names and _create_io_tab_page()
 		for (auto& file_pair : file_pairs)
 		{
 			auto before_last_slash = file_pair.first.find_last_of(L"/\\") - 1;
@@ -727,17 +769,22 @@ namespace overseer_gui
 				after_second_last_slash,
 				before_last_slash - after_second_last_slash + 1
 			);
-			auto folder_u8 = charset(folder_wstr).to_bytes(unicode::utf8);
-			if (folder_u8.empty())
-				folder_u8 = "root";
-			_create_io_tab_page(std::move(folder_u8), std::move(file_pair.first), std::move(file_pair.second));
+			if (folder_wstr.empty())
+				folder_wstr = L"root";
+			_create_io_tab_page(
+				charset(folder_wstr).to_bytes(unicode::utf8),
+				std::move(file_pair.first),
+				std::move(file_pair.second)
+			);
 		}
 
 		place_.collocate();
 
+		// restore the condition of timer_io_tab_state_
 		if (timer_io_tab_state_was_going)
 			timer_io_tab_state_.start();
 
+		// _make_timer_tabbar_color_animation() for all tabs
 		for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 			_make_timer_tabbar_color_animation(i);
 	}

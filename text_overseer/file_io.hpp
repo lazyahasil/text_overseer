@@ -77,9 +77,9 @@ namespace file_io
 			bool					is_resizable
 		)
 		{
-			auto do_write_16_bit = false;
 			if (!update_locale_by_read_bom()) // includes _read_file_check()
 				return 0U;
+			auto do_write_16_bit = false;
 			if (file_locale_ == encoding::utf16_le)
 			{
 				if (sizeof(buf[0]) == 2)

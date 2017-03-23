@@ -26,6 +26,7 @@ namespace file_system
 
 		search_file_pairs(std::make_pair(input_filename, output_filename), dir_path, io_files, ecs_with_path, true);
 
+		// even if either of two files doesn't exist, it can return both of those path strings
 		if (do_always_create_both_path)
 		{
 			for (auto& file_pair : io_files)
