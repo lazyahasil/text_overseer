@@ -4,7 +4,7 @@
 
 namespace overseer_misc
 {
-	constexpr char* k_version_str = "0.2.5.0";
+	constexpr char* k_version_str = "0.2.5.1";
 
 	// the functions of namespace encoding_convert are needed for certain reasons below
 	// 1. nana::charset() doesn't fully support wide -> ANSI conversion

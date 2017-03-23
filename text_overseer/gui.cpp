@@ -499,6 +499,7 @@ namespace overseer_gui
 
 	bool OutputFileBoxUnit::format_by_diff_between_answer(const std::string& answer)
 	{
+		// nana::widget::caption returns string that newlined as "\n\r"
 		auto caption = textbox_.caption();
 
 		if (caption.empty() || answer.empty())
@@ -512,30 +513,42 @@ namespace overseer_gui
 
 		using IterRange = boost::iterator_range<std::string::const_iterator>;
 		std::vector<IterRange> v_file, v_answer;
-		std::ostringstream out_ss;
+		std::string result;
 
 		boost::iter_split(v_file, caption, boost::token_finder(boost::is_any_of("\r")));
 		boost::iter_split(v_answer, answer, boost::token_finder(boost::is_any_of("\r")));
 
 		if (v_file.size() == v_answer.size())
 		{
+			std::ostringstream out_ss;
 			std::size_t size = v_file.size();
 			for (std::size_t i = 0; i < size; i++)
 			{
 				boost::string_view strv_file(&*v_file[i].begin(), v_file[i].size());
 				boost::string_view strv_answer(&*v_answer[i].begin(), v_answer[i].size());
+				if (strv_file.back() == '\n')
+					strv_file.remove_suffix(1);
+				if (strv_file.back() == ' ')
+					strv_file.remove_suffix(1);
+				if (strv_answer.back() == '\n')
+					strv_answer.remove_suffix(1);
+				if (strv_answer.back() == ' ')
+					strv_answer.remove_suffix(1);
 				if (strv_file == strv_answer)
-				{
-					out_ss << u8"= " << strv_file;
-				}
+					out_ss << u8"= " << strv_file << "\n";
 				else
-				{
-					out_ss << u8"≠ " << strv_file;
-				}
+					out_ss << u8"≠ " << strv_file << "\n";
 			}
+			result = out_ss.str();
+			if (caption.back() != '\r')
+				result.pop_back();
+		}
+		else
+		{
+			result = std::move(caption);
 		}
 
-		textbox_.caption(out_ss.str());
+		textbox_.caption(result);
 
 		return true;
 	}
