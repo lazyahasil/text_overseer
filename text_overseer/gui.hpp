@@ -41,14 +41,13 @@ namespace overseer_gui
 		nana::menu popup_menu_;
 	};
 
-	class TextBoxUnit : public AbstractBoxUnit
+	class AnswerTextBoxUnit : public AbstractBoxUnit
 	{
 	public:
-		TextBoxUnit(nana::window wd);
+		AnswerTextBoxUnit(nana::window wd);
 
 		bool update_label_state() noexcept override { return false; }
-
-	private:
+		std::string textbox_caption() { return textbox_.caption(); }
 	};
 
 	class AbstractIOFileBoxUnit : public AbstractBoxUnit
@@ -89,8 +88,7 @@ namespace overseer_gui
 
 	private:
 		bool _check_last_write_time() noexcept;
-		void _make_event_btn_reload() noexcept;
-		void _make_event_combo_locale() noexcept;
+		void _make_events() noexcept;
 	};
 
 	class InputFileBoxUnit : public AbstractIOFileBoxUnit
@@ -106,7 +104,7 @@ namespace overseer_gui
 		nana::button btn_save_{ *this, u8"저장" };
 
 	private:
-		// call it when failed to write; the file must be opened for writing
+		// call it when failed to write; the file_ must be opened for writing
 		void _restore_opened_file_to_utf8();
 
 		std::string text_backup_u8_;
@@ -116,6 +114,8 @@ namespace overseer_gui
 	{
 	public:
 		OutputFileBoxUnit(nana::window wd);
+
+		bool format_by_diff_between_answer(const std::string& answer);
 
 	protected:
 		virtual bool _write_file() noexcept override { return false; }
@@ -144,7 +144,11 @@ namespace overseer_gui
 
 		bool update_io_file_box_state() noexcept
 		{
-			return input_box_.update_label_state() || output_box_.update_label_state();
+			auto state_input = input_box_.update_label_state();
+			auto state_output = output_box_.update_label_state();
+			if (state_output)
+				output_box_.format_by_diff_between_answer(answer_box_.textbox_caption());
+			return state_input || state_output;
 		}
 
 	protected:
@@ -152,7 +156,7 @@ namespace overseer_gui
 
 		InputFileBoxUnit input_box_{ *this };
 		OutputFileBoxUnit output_box_{ *this };
-		TextBoxUnit answer_result_box_{ *this };
+		AnswerTextBoxUnit answer_box_{ *this };
 	};
 
 	class MainWindow : public nana::form

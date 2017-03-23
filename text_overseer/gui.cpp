@@ -1,10 +1,14 @@
-﻿#include "gui.hpp"
+﻿// std::copy() for char* in boost library(string.hpp) causes a MS complier error
+#define _SCL_SECURE_NO_WARNINGS
+
+#include "gui.hpp"
 #include "overseer_misc.hpp"
 #include "error_handler.hpp"
 #include "overseer_rc.hpp"
 
 #include <codecvt>
-#include <nana/gui/state_cursor.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/utility/string_view.hpp>
 
 using namespace error_handler;
 using namespace file_io;
@@ -27,32 +31,29 @@ namespace overseer_gui
 	void AbstractBoxUnit::_make_textbox_popup_menu()
 	{
 		popup_menu_.append(u8"복사 (Ctrl+C)", [this](menu::item_proxy& ip) {
-			if (this->textbox_.selected())
-				this->textbox_.copy();
+			if (!this->textbox_.selected())
+				return;
+			this->textbox_.copy();
 		});
 
 		popup_menu_.append(u8"붙여넣기 (Ctrl+V)", [this](menu::item_proxy& ip) {
-			this->textbox_.focus();
 			this->textbox_.paste();
 		});
 
 		popup_menu_.append_splitter();
 
 		popup_menu_.append(u8"모두 선택 (Ctrl+A)", [this](menu::item_proxy& ip) {
-			this->textbox_.focus();
 			this->textbox_.select(true);
 		});
 
 		//textbox_.events().mouse_down(menu_popuper(popup_menu_));
 		textbox_.events().mouse_down([this](const arg_mouse& arg) {
-			// have to change the mouse cursor
-
-			// call menu_popuper
+			this->textbox_.focus();
 			menu_popuper(this->popup_menu_)(arg);
 		});
 	}
 
-	TextBoxUnit::TextBoxUnit(window wd) : AbstractBoxUnit(wd)
+	AnswerTextBoxUnit::AnswerTextBoxUnit(window wd) : AbstractBoxUnit(wd)
 	{
 		place_.div(
 			"<vert "
@@ -66,7 +67,9 @@ namespace overseer_gui
 		place_["lab_state"] << lab_state_;
 
 		lab_name_.caption(u8"<size=11>정답 출력</>");
-		lab_state_.caption(u8"텍스트 비교 기능 미완성");
+		lab_state_.caption(u8"<size=8>먼저 위에 텍스트를 입력하면, "
+			u8"출력 파일을 읽을 때 자동으로 비교합니다. <bold>(실험 기능)</></>");
+		lab_state_.format(true);
 	}
 
 	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
@@ -82,8 +85,7 @@ namespace overseer_gui
 		btn_reload_.enabled(false);
 
 		// make event
-		_make_event_btn_reload();
-		_make_event_combo_locale();
+		_make_events();
 	}
 
 	bool AbstractIOFileBoxUnit::update_label_state() noexcept
@@ -229,15 +231,12 @@ namespace overseer_gui
 		return false;
 	}
 
-	void AbstractIOFileBoxUnit::_make_event_btn_reload() noexcept
+	void AbstractIOFileBoxUnit::_make_events() noexcept
 	{
 		btn_reload_.events().click([this](const arg_click&) {
 			this->read_file();
 		});
-	}
 
-	void AbstractIOFileBoxUnit::_make_event_combo_locale() noexcept
-	{
 		combo_locale_.events().selected([this](const arg_combox& arg_combo) {
 			// update file locale
 			for (auto i = 0; i < k_max_count_try_to_update_widget; i++)
@@ -493,6 +492,52 @@ namespace overseer_gui
 
 		// widget initiation - combox
 		combo_locale_.enabled(false);
+
+		// widget modification - menu
+		popup_menu_.enabled(1, false); // make paste unable
+	}
+
+	bool OutputFileBoxUnit::format_by_diff_between_answer(const std::string& answer)
+	{
+		auto caption = textbox_.caption();
+
+		if (caption.empty() || answer.empty())
+			return false;
+
+		// needs mutex lock because it's going to use boost::string_view
+		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
+
+		if (!lock)
+			return false; // return if the file process is busy (fail trying to lock)
+
+		using IterRange = boost::iterator_range<std::string::const_iterator>;
+		std::vector<IterRange> v_file, v_answer;
+		std::ostringstream out_ss;
+
+		boost::iter_split(v_file, caption, boost::token_finder(boost::is_any_of("\r")));
+		boost::iter_split(v_answer, answer, boost::token_finder(boost::is_any_of("\r")));
+
+		if (v_file.size() == v_answer.size())
+		{
+			std::size_t size = v_file.size();
+			for (std::size_t i = 0; i < size; i++)
+			{
+				boost::string_view strv_file(&*v_file[i].begin(), v_file[i].size());
+				boost::string_view strv_answer(&*v_answer[i].begin(), v_answer[i].size());
+				if (strv_file == strv_answer)
+				{
+					out_ss << u8"= " << strv_file;
+				}
+				else
+				{
+					out_ss << u8"≠ " << strv_file;
+				}
+			}
+		}
+
+		textbox_.caption(out_ss.str());
+
+		return true;
 	}
 
 	IOFilesTabPage::IOFilesTabPage(window wd) : panel<true>(wd)
@@ -510,7 +555,7 @@ namespace overseer_gui
 		);
 		place_["input_box"] << input_box_;
 		place_["output_box"] << output_box_;
-		place_["answer_box"] << answer_result_box_;
+		place_["answer_box"] << answer_box_;
 	}
 
 	MainWindow::MainWindow()
