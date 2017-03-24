@@ -63,9 +63,9 @@ namespace file_io
 			return false;
 		file_.seekg(0, std::ios::beg);
 		if (file_locale_ == encoding::utf8)
-			file_.write(bom::k_u8, 3);
+			file_.write(&bom::k_u8[0], bom::k_u8.size());
 		else if (file_locale_ == encoding::utf16_le)
-			file_.write(bom::k_u16_le, 2);
+			file_.write(&bom::k_u16_le[0], bom::k_u16_le.size());
 		return true;
 	}
 

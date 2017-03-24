@@ -4,8 +4,6 @@
 
 namespace overseer_misc
 {
-	constexpr char* k_version_str = "0.2.5.1";
-
 	// the functions of namespace encoding_convert are needed for certain reasons below
 	// 1. nana::charset() doesn't fully support wide -> ANSI conversion
 	// 2. nana::charset() doesn't fully support unicode -> unicode conversion
@@ -53,48 +51,56 @@ namespace overseer_misc
 		}
 	}
 
-	// source: http://www.zedwood.com/article/cpp-is-valid-utf8-string-function
-	template <class ConstStringContainer>
-	bool utf8_check_vaild(const ConstStringContainer& str, std::size_t length_limit)
+	inline namespace encoding_misc
 	{
-		std::size_t len;
-		if (length_limit == std::string::npos)
-			len = str.length();
-		else
-			len = std::min(length_limit, str.length());
-		for (std::size_t i = 0; i < len; i++)
+		// source: http://www.zedwood.com/article/cpp-is-valid-utf8-string-function
+		template <class ConstStringContainer>
+		bool utf8_check_vaild(const ConstStringContainer& str, std::size_t length_limit, bool to_except_ascii_text)
 		{
-			int c = static_cast<unsigned char>(str[i]);
-			std::size_t n;
-			//if (c==0x09 || c==0x0a || c==0x0d || (c >= 0x20 && c <= 0x7e) ) n = 0; // is_printable_ascii
-			if (c >= 0x00 && c <= 0x7f) // 0bbbbbbb
-				n = 0;
-			else if ((c & 0xE0) == 0xC0) // 110bbbbb
-				n = 1;
-			else if ( c == 0xED && i < len - 1
-				&& (static_cast<unsigned char>(str[i + 1]) & 0xA0) == 0xA0 ) //U+d800 to U+dfff
-				return false;
-			else if ((c & 0xF0) == 0xE0) // 1110bbbb
-				n = 2;
-			else if ((c & 0xF8) == 0xF0) // 11110bbb
-				n = 3;
-			//else if ((c & 0xFC) == 0xF8) n=4; // 111110bb // byte 5, unnecessary in 4 byte UTF-8
-			//else if ((c & 0xFE) == 0xFC) n=5; // 1111110b // byte 6, unnecessary in 4 byte UTF-8
+			std::size_t len;
+			auto is_ascii_only = true;
+			if (length_limit == std::string::npos)
+				len = str.length();
 			else
-				return false;
-			for (std::size_t j = 0; j < n && i < len; j++) // n bytes matching 10bbbbbb follow ?
+				len = std::min(length_limit, str.length());
+			for (std::size_t i = 0; i < len; i++)
 			{
-				if ( ( ++i == len && length_limit == std::string::npos )
-					|| ( (static_cast<unsigned char>(str[i]) & 0xC0) != 0x80 ) )
+				int c = static_cast<unsigned char>(str[i]);
+				std::size_t n;
+				//if (c==0x09 || c==0x0a || c==0x0d || (c >= 0x20 && c <= 0x7e) ) n = 0; // is_printable_ascii
+				if (c >= 0x00 && c <= 0x7f) // 0bbbbbbb
+					n = 0;
+				else if ((c & 0xE0) == 0xC0) // 110bbbbb
+					n = 1;
+				else if (c == 0xED && i < len - 1
+					&& (static_cast<unsigned char>(str[i + 1]) & 0xA0) == 0xA0) //U+d800 to U+dfff
 					return false;
+				else if ((c & 0xF0) == 0xE0) // 1110bbbb
+					n = 2;
+				else if ((c & 0xF8) == 0xF0) // 11110bbb
+					n = 3;
+				//else if ((c & 0xFC) == 0xF8) n=4; // 111110bb // byte 5, unnecessary in 4 byte UTF-8
+				//else if ((c & 0xFE) == 0xFC) n=5; // 1111110b // byte 6, unnecessary in 4 byte UTF-8
+				else
+					return false;
+				if (to_except_ascii_text && is_ascii_only && n > 0)
+					is_ascii_only = false;
+				for (std::size_t j = 0; j < n && i < len; j++) // n bytes matching 10bbbbbb follow ?
+				{
+					if ((++i == len && length_limit == std::string::npos)
+						|| ((static_cast<unsigned char>(str[i]) & 0xC0) != 0x80))
+						return false;
+				}
 			}
+			if (to_except_ascii_text && is_ascii_only)
+				return false;
+			return true;
 		}
-		return true;
-	}
 
-	template <class ConstStringContainer>
-	bool utf8_check_vaild(const ConstStringContainer& str)
-	{
-		return utf8_check_vaild(str, std::string::npos);
+		template <class ConstStringContainer>
+		bool utf8_check_vaild(const ConstStringContainer& str)
+		{
+			return utf8_check_vaild(str, std::string::npos, false);
+		}
 	}
 }

@@ -1,4 +1,4 @@
-﻿#include "gui.hpp"
+﻿#include "gui_main.hpp"
 #include "error_handler.hpp"
 
 int main()

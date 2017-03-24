@@ -18,20 +18,17 @@
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="gui.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="file_system.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="file_io.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="gui_main.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="gui.hpp">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="file_system.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -47,7 +44,13 @@
     <ClInclude Include="overseer_rc.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="overseer_misc.hpp">
+    <ClInclude Include="gui_main.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="overseer.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="misc_encoding.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

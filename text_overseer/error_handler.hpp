@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "overseer.hpp"
 #include "file_io.hpp"
 #include "singleton.hpp"
 
@@ -85,6 +86,9 @@ namespace error_handler
 		}
 
 		bool started{ false };
-		file_io::FileIO file_{ L"text_overseer.log", file_io::FileIO::encoding::utf8 };
+		file_io::FileIO file_{
+			std::wstring(L"text_overseer_") + overseer::k_version_num_wstr + L".log",
+			file_io::FileIO::encoding::utf8
+		};
 	};
 }

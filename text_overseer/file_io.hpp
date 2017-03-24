@@ -1,7 +1,8 @@
 ﻿#pragma once
 
-#include "overseer_misc.hpp"
+#include "misc_encoding.hpp"
 
+#include <array>
 #include <fstream>
 
 namespace file_io
@@ -13,15 +14,15 @@ namespace file_io
 
 		namespace bom // Byte Order Mark
 		{
-			constexpr unsigned char k_u8[3]{ 0xEF, 0xBB, 0xBF };
-			constexpr unsigned char k_u16_le[2]{ 0xFF, 0xFE };
-			//constexpr unsigned char k_u16_be[2]{ 0xFE, 0xFF };
+			constexpr std::array<unsigned char, 3> k_u8{ 0xEF, 0xBB, 0xBF };
+			constexpr std::array<unsigned char, 2> k_u16_le{ 0xFF, 0xFE };
+			//constexpr std::array<unsigned char, 2> k_u16_be{ 0xFE, 0xFF };
 		}
 
 		namespace newline
 		{
-			const std::basic_string<unsigned char> k_ascii_cr_lf{ 0x0D, 0x0A };
-			const std::basic_string<unsigned char> k_u16le_cr_lf{ 0x0D, 0x00, 0x0A, 0x00 };
+			const std::array<unsigned char, 2> k_ascii_cr_lf{ 0x0D, 0x0A };
+			const std::array<unsigned char, 4> k_u16le_cr_lf{ 0x0D, 0x00, 0x0A, 0x00 };
 			//const std::basic_string<unsigned char> k_ascii_lf{ 0x0A };
 			//const std::basic_string<unsigned char> k_u16le_lf{ 0x0A, 0x00 };
 
@@ -40,7 +41,7 @@ namespace file_io
 			unknown,		// neutral or fail => can be automatically translated to ANSI
 			system,			// ANSI(system locale)
 			utf8,			// UTF-8 with BOM
-			utf8_no_bom,	// UTF-8 without BOM
+			utf8_no_bom,	// UTF-8 without BOM => will be treated as ANSI if there are ASCII codes only
 			utf16_le		// UTF-16LE
 		};
 
@@ -102,7 +103,7 @@ namespace file_io
 			// when encoding is system, check if it's UTF-8 without BOM, within certain bytes of string
 			if (file_locale_ == encoding::system)
 			{
-				if (overseer_misc::utf8_check_vaild(buf, k_max_size_check_utf8))
+				if (overseer_misc::utf8_check_vaild(buf, k_max_size_check_utf8, true))
 					file_locale_ = encoding::utf8_no_bom;
 			}
 			return sequence_length;
@@ -139,16 +140,16 @@ namespace file_io
 			return true;
 		}
 
-		template <class ConstStringBuffer, class CharT>
+		template <class ConstStringBuffer1, class ConstStringBuffer2>
 		bool write_line(
-			const ConstStringBuffer& buf,
+			const ConstStringBuffer1& buf,
 			std::size_t byte_length,
-			const std::basic_string<CharT>& newline
+			const ConstStringBuffer2& newline
 		)
 		{
 			if (!write_some(buf, byte_length))
 				return false;
-			file_.write(reinterpret_cast<const unsigned char*>(newline.data()), newline.size());
+			file_.write(reinterpret_cast<const unsigned char*>(&newline[0]), newline.size());
 			return true;
 		}
 

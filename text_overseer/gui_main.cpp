@@ -1,8 +1,9 @@
 ﻿// std::copy() for char* in boost library(string.hpp) causes a MS complier error
 #define _SCL_SECURE_NO_WARNINGS
 
-#include "gui.hpp"
-#include "overseer_misc.hpp"
+#include "overseer.hpp"
+#include "gui_main.hpp"
+#include "misc_encoding.hpp"
 #include "error_handler.hpp"
 #include "overseer_rc.hpp"
 
@@ -13,6 +14,7 @@
 using namespace error_handler;
 using namespace file_io;
 using namespace nana;
+using namespace overseer;
 using namespace overseer_misc;
 
 namespace overseer_gui
