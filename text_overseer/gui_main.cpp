@@ -135,8 +135,8 @@ namespace overseer_gui
 		place_["lab_state"] << lab_state_;
 
 		lab_name_.caption(u8"<size=11>정답 출력</>");
-		lab_state_.caption(u8"<size=8>먼저 위에 텍스트를 입력하면, "
-			u8"출력 파일을 읽을 때 자동으로 비교합니다. <bold>(실험 기능)</></>");
+		lab_state_.caption(u8"<size=8>출력 파일을 읽을 때 자동으로 비교합니다. "
+			u8"다시 읽기를 눌러도 됩니다. <bold>(실험 기능)</></>");
 		lab_state_.format(true);
 
 		_make_textbox_line_num();
@@ -647,26 +647,65 @@ namespace overseer_gui
 			boost::iter_split(f_words, f_lines[i], boost::token_finder(boost::is_any_of(" ")));
 			boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" ")));
 
-			if (f_words.size() != a_words.size())
-			{
-				line_diff_results_.push_back(false);
-				continue;
-			}
-
 			auto line_is_different = false;
-			auto size = f_words.size();
-			
-			for (std::size_t k = 0; k < size; k++)
+			auto f_words_size = f_words.size();
+			auto a_words_size = a_words.size();
+			std::size_t k, l;
+
+			for (k = 0, l = 0; k < f_words_size && l < a_words_size; k++, l++)
 			{
 				boost::string_view f_sv, a_sv;
+
+				if (f_words[k].size() == 0 && a_words[l].size() == 0)
+					continue;
+
 				if (f_words[k].size() != 0)
+				{
 					f_sv = boost::string_view(&*f_words[k].begin(), f_words[k].size());
-				if (a_words[k].size() != 0)
-					a_sv = boost::string_view(&*a_words[k].begin(), a_words[k].size());
+				}
+				else
+				{
+					l--;
+					continue;
+				}
+
+				if (a_words[l].size() != 0)
+				{
+					a_sv = boost::string_view(&*a_words[l].begin(), a_words[l].size());
+				}
+				else
+				{
+					k--;
+					continue;
+				}
+
 				if (f_sv != a_sv)
 				{
 					line_is_different = true;
 					break;
+				}
+			}
+
+			if (!line_is_different && k != f_words_size)
+			{
+				while (k < f_words_size)
+				{
+					if (f_words[k++].size() != 0)
+					{
+						line_is_different = true;
+						break;
+					}
+				}
+			}
+			else if (!line_is_different && l != a_words_size)
+			{
+				while (l < a_words_size)
+				{
+					if (a_words[l++].size() != 0)
+					{
+						line_is_different = true;
+						break;
+					}
 				}
 			}
 			
@@ -706,6 +745,20 @@ namespace overseer_gui
 		place_["input_box"] << input_box_;
 		place_["output_box"] << output_box_;
 		place_["answer_box"] << answer_box_;
+	}
+
+	bool IOFilesTabPage::output_box_line_diff()
+	{
+		switch (output_box_.line_diff_between_answer(answer_box_.textbox_caption()))
+		{
+		case OutputFileBoxUnit::line_diff_sign::done:
+			answer_box_.label_caption(u8"비교가 끝났습니다.");
+			return true;
+		case OutputFileBoxUnit::line_diff_sign::file_is_shorter:
+			answer_box_.label_caption(u8"<red>파일이 더 짧습니다!!</>");
+			return true;
+		}
+		return false;
 	}
 
 	MainWindow::MainWindow()

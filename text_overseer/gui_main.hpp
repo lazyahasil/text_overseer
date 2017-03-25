@@ -65,6 +65,8 @@ namespace overseer_gui
 		AnswerTextBoxUnit(nana::window wd);
 
 		bool update_label_state() noexcept override { return false; }
+		void label_caption(const std::string &str) { lab_state_.caption(str); }
+		void label_caption(std::string &&str) { lab_state_.caption(str); }
 		std::string textbox_caption() { return textbox_.caption(); }
 	};
 
@@ -165,17 +167,7 @@ namespace overseer_gui
 			return input_box_.is_same_file(input_filename) && output_box_.is_same_file(output_filename);
 		}
 
-		bool output_box_line_diff()
-		{
-			switch (output_box_.line_diff_between_answer(answer_box_.textbox_caption()))
-			{
-			case OutputFileBoxUnit::line_diff_sign::done:
-				return true;
-			case OutputFileBoxUnit::line_diff_sign::file_is_shorter:
-				return true;
-			}
-			return false;
-		}
+		bool output_box_line_diff();
 
 		void register_files(std::wstring input_filename, std::wstring output_filename)
 		{
