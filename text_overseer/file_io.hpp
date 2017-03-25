@@ -23,8 +23,8 @@ namespace file_io
 		{
 			const std::array<unsigned char, 2> k_ascii_cr_lf{ 0x0D, 0x0A };
 			const std::array<unsigned char, 4> k_u16le_cr_lf{ 0x0D, 0x00, 0x0A, 0x00 };
-			//const std::basic_string<unsigned char> k_ascii_lf{ 0x0A };
-			//const std::basic_string<unsigned char> k_u16le_lf{ 0x0A, 0x00 };
+			//const std::array<unsigned char, 1> k_ascii_lf{ 0x0A };
+			//const std::array<unsigned char, 2> k_u16le_lf{ 0x0A, 0x00 };
 
 			inline const auto& ascii() { return k_ascii_cr_lf; } // returns default ascii newline
 			inline const auto& u16le() { return k_u16le_cr_lf; } // returns default u16le newline

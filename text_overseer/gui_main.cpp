@@ -7,7 +7,6 @@
 #include "error_handler.hpp"
 #include "overseer_rc.hpp"
 
-#include <codecvt>
 #include <boost/algorithm/string.hpp>
 #include <boost/utility/string_view.hpp>
 
@@ -19,6 +18,11 @@ using namespace overseer_misc;
 
 namespace overseer_gui
 {
+	nana::color line_num_default_color(unsigned int)
+	{
+		return nana::colors::antique_white;
+	}
+
 	AbstractBoxUnit::AbstractBoxUnit(window wd) : panel<false>(wd)
 	{
 		lab_name_.format(true);
@@ -27,7 +31,64 @@ namespace overseer_gui
 		lab_name_.format(true);
 		lab_name_.text_align(align::left, align_v::center);
 
+		line_num_.bgcolor(colors::gray);
+
 		_make_textbox_popup_menu();
+	}
+
+	void AbstractBoxUnit::_make_textbox_line_num() noexcept
+	{
+		drawing{ line_num_ }.draw([this](paint::graphics& graph)
+		{
+			//Returns the text position of each line that currently displays on screen.
+			auto text_pos = this->textbox_.text_position();
+			if (text_pos.empty())
+				return;
+
+			auto largest_num = text_pos.back().y + 1;
+			unsigned int log10_num = 0;
+			while ((largest_num /= 10) != 0)
+				log10_num++;
+			unsigned int width = log10_num * 8 + 15;
+
+			if (this->textbox_.edited() && width != graph.width())
+			{
+				//Change the weight of 'line' field.
+				std::stringstream ss;
+				ss << "weight=" << width;
+				this->place_.modify("line_num", ss.str().c_str());
+				this->place_.collocate();
+			}
+
+			int top = this->textbox_.text_area().y;
+			unsigned int inner_width = width - 4;
+			unsigned int line_height = this->textbox_.line_pixels();
+
+			for (const auto& pos : text_pos)
+			{
+				auto num_wstr = std::to_wstring(pos.y + 1);
+				auto pixels = graph.text_extent_size(num_wstr).width;
+				graph.rectangle({ 2, top, inner_width, line_height }, true, this->line_num_color_func_(pos.y));
+				graph.string({ static_cast<int>(inner_width - pixels), top }, num_wstr);
+				top += line_height;
+			}
+		});
+
+		// nana::drawerbase::textbox::textbox_events event doesn't work at all (nana 1.4.1)
+
+		textbox_.events().mouse_wheel([this] {
+			this->refresh_textbox_line_num();
+		}); // mouse wheel does effect even when it's not focused
+		textbox_.events().resized([this] {
+			this->refresh_textbox_line_num();
+		});
+
+		line_num_refresh_timer_.interval(k_ms_time_gui_timer_interval);
+		line_num_refresh_timer_.elapse([this](const nana::arg_elapse&) {
+			if (this->textbox_.focused())
+				this->refresh_textbox_line_num();
+		});
+		line_num_refresh_timer_.start();
 	}
 
 	void AbstractBoxUnit::_make_textbox_popup_menu()
@@ -60,11 +121,16 @@ namespace overseer_gui
 		place_.div(
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0] lab_name>"
-			"  <textbox>"
+			"  <"
+			"    <weight=15 line_num>"
+			"    <weight=2>"
+			"    <textbox>"
+			"  >"
 			"  <weight=42 margin=[3,0,0,0] lab_state>"
 			">"
 		);
 		place_["lab_name"] << lab_name_;
+		place_["line_num"] << line_num_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 
@@ -72,6 +138,8 @@ namespace overseer_gui
 		lab_state_.caption(u8"<size=8>먼저 위에 텍스트를 입력하면, "
 			u8"출력 파일을 읽을 때 자동으로 비교합니다. <bold>(실험 기능)</></>");
 		lab_state_.format(true);
+
+		_make_textbox_line_num();
 	}
 
 	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
@@ -136,6 +204,8 @@ namespace overseer_gui
 		);
 		str += u8"전";
 		lab_state_.caption(str);
+
+		refresh_textbox_line_num();
 
 		return file_is_changed;
 	}
@@ -255,6 +325,7 @@ namespace overseer_gui
 
 	InputFileBoxUnit::InputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
 	{
+		// div
 		place_.div(
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
@@ -263,7 +334,11 @@ namespace overseer_gui
 			//"    <weight=3>"
 			//"    <weight=25 btn_folder>"
 			"  >"
-			"  <textbox>"
+			"  <"
+			"    <weight=15 line_num>"
+			"    <weight=2>"
+			"    <textbox>"
+			"  >"
 			"  <weight=42 margin=[3,0,0,0]"
 			"    <vert margin=[0,3,0,0]"
 			"      <margin=[0,0,3,0] lab_state>"
@@ -275,13 +350,16 @@ namespace overseer_gui
 		place_["lab_name"] << lab_name_;
 		place_["btn_reload"] << btn_reload_;
 		//place_["btn_folder"] << btn_folder_;
+		place_["line_num"] << line_num_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 		place_["combo_locale"] << combo_locale_;
 		place_["btn_save"] << btn_save_;
 
+		// widget initiation - label
 		lab_name_.caption(u8"<size=11><bold>input</>.txt</>");
 
+		// make events
 		btn_save_.events().click([this](const arg_click&) {
 			if (!this->_write_file())
 			{
@@ -296,6 +374,9 @@ namespace overseer_gui
 				mb.show();
 			}
 		});
+
+		// etc.
+		_make_textbox_line_num();
 	}
 
 	bool InputFileBoxUnit::read_file()
@@ -458,7 +539,7 @@ namespace overseer_gui
 		}
 	}
 
-	OutputFileBoxUnit::OutputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
+	OutputFileBoxUnit::OutputFileBoxUnit(IOFilesTabPage& parent_tab_page) : AbstractIOFileBoxUnit(parent_tab_page)
 	{
 		// div
 		place_.div(
@@ -469,7 +550,11 @@ namespace overseer_gui
 			//"    <weight=3>"
 			//"    <weight=25 btn_folder>"
 			"  >"
-			"  <textbox>"
+			"  <"
+			"    <weight=15 line_num>"
+			"    <weight=2>"
+			"    <textbox>"
+			"  >"
 			"  <weight=42 margin=[3,0,0,0]"
 			"    <vert margin=[0,3,0,0]"
 			"      <margin=[0,0,3,0] lab_state>"
@@ -481,6 +566,7 @@ namespace overseer_gui
 		place_["lab_name"] << lab_name_;
 		place_["btn_reload"] << btn_reload_;
 		//place_["btn_folder"] << btn_folder_;
+		place_["line_num"] << line_num_;
 		place_["textbox"] << textbox_;
 		place_["lab_state"] << lab_state_;
 		place_["combo_locale"] << combo_locale_;
@@ -497,62 +583,111 @@ namespace overseer_gui
 
 		// widget modification - menu
 		popup_menu_.enabled(1, false); // make paste unable
+
+		// etc.
+		_make_textbox_line_num();
+		line_num_color_func_ = [this](unsigned int num) {
+			if (!this->did_line_diff_ || num >= this->line_diff_results_.size())
+				return colors::antique_white;
+			if (line_diff_results_[num])
+				return colors::yellow_green;
+			return colors::orange_red;
+		};
+		call_tab_page_line_diff_func_ = [&parent_tab_page] {
+			return parent_tab_page.output_box_line_diff();
+		};
 	}
 
-	bool OutputFileBoxUnit::format_by_diff_between_answer(const std::string& answer)
+	bool OutputFileBoxUnit::read_file()
 	{
-		// nana::widget::caption returns string that newlined as "\n\r"
-		auto caption = textbox_.caption();
-
-		if (caption.empty() || answer.empty())
+		if (!AbstractIOFileBoxUnit::read_file()) // call its parent class's method
 			return false;
 
-		// needs mutex lock because it's going to use boost::string_view
-		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
+		call_tab_page_line_diff_func_();
+		return true;
+	}
 
-		if (!lock)
-			return false; // return if the file process is busy (fail trying to lock)
+	OutputFileBoxUnit::line_diff_sign OutputFileBoxUnit::line_diff_between_answer(const std::string& answer)
+	{
+		// clear the result
+		did_line_diff_ = false;
+		line_diff_results_.clear();
 
-		using IterRange = boost::iterator_range<std::string::const_iterator>;
-		std::vector<IterRange> v_file, v_answer;
+		// nana::widget::caption returns string that newlined as "\n\r"
+		const auto file_str = textbox_.caption();
+
+		if (file_str.empty() || answer.empty())
+			return line_diff_sign::error;
+
+		using CIterRange = boost::iterator_range<std::string::const_iterator>;
+		std::vector<CIterRange> f_lines, a_lines;
 		std::string result;
 
-		boost::iter_split(v_file, caption, boost::token_finder(boost::is_any_of("\r")));
-		boost::iter_split(v_answer, answer, boost::token_finder(boost::is_any_of("\r")));
+		boost::iter_split(f_lines, file_str, boost::token_finder(boost::is_any_of("\n")));
+		boost::iter_split(a_lines, answer, boost::token_finder(boost::is_any_of("\n")));
 
-		if (v_file.size() == v_answer.size())
+		const auto f_lines_size = f_lines.size();
+		const auto a_lines_size = a_lines.size();
+		std::size_t i, j;
+
+		for (i = 0, j = 0; i < f_lines_size && j < a_lines_size; i++, j++)
 		{
-			std::ostringstream out_ss;
-			std::size_t size = v_file.size();
-			for (std::size_t i = 0; i < size; i++)
+			if (f_lines[i].begin() == f_lines[i].end())
 			{
-				boost::string_view strv_file(&*v_file[i].begin(), v_file[i].size());
-				boost::string_view strv_answer(&*v_answer[i].begin(), v_answer[i].size());
-				if (strv_file.back() == '\n')
-					strv_file.remove_suffix(1);
-				if (strv_file.back() == ' ')
-					strv_file.remove_suffix(1);
-				if (strv_answer.back() == '\n')
-					strv_answer.remove_suffix(1);
-				if (strv_answer.back() == ' ')
-					strv_answer.remove_suffix(1);
-				if (strv_file == strv_answer)
-					out_ss << u8"= " << strv_file << "\n";
-				else
-					out_ss << u8"≠ " << strv_file << "\n";
+				j--;
+				continue;
 			}
-			result = out_ss.str();
-			if (caption.back() != '\r')
-				result.pop_back();
-		}
-		else
-		{
-			result = std::move(caption);
+			if (f_lines[j].begin() == f_lines[j].end())
+			{
+				i--;
+				continue;
+			}
+
+			std::vector<CIterRange> f_words, a_words;
+			boost::iter_split(f_words, f_lines[i], boost::token_finder(boost::is_any_of(" ")));
+			boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" ")));
+
+			if (f_words.size() != a_words.size())
+			{
+				line_diff_results_.push_back(false);
+				continue;
+			}
+
+			auto line_is_different = false;
+			auto size = f_words.size();
+			
+			for (std::size_t k = 0; k < size; k++)
+			{
+				boost::string_view f_sv, a_sv;
+				if (f_words[k].size() != 0)
+					f_sv = boost::string_view(&*f_words[k].begin(), f_words[k].size());
+				if (a_words[k].size() != 0)
+					a_sv = boost::string_view(&*a_words[k].begin(), a_words[k].size());
+				if (f_sv != a_sv)
+				{
+					line_is_different = true;
+					break;
+				}
+			}
+			
+			if (line_is_different)
+				line_diff_results_.push_back(false);
+			else
+				line_diff_results_.push_back(true);
 		}
 
-		textbox_.caption(result);
+		auto f_rest_lines_size = f_lines_size - i;
+		if (f_rest_lines_size && boost::ends_with(file_str, "\n\r"))
+			f_rest_lines_size--;
+		for (i = 0; i < f_rest_lines_size; i++)
+			line_diff_results_.push_back(false);
 
-		return true;
+		did_line_diff_ = true;
+
+		if (f_lines_size < a_lines_size)
+			return line_diff_sign::file_is_shorter;
+
+		return line_diff_sign::done;
 	}
 
 	IOFilesTabPage::IOFilesTabPage(window wd) : panel<true>(wd)
@@ -561,9 +696,9 @@ namespace overseer_gui
 			"<"
 			"  <weight=5>"
 			"  <"
-			"    <input_box>"
-			"    | <output_box>"
-			"    | <weight=25% answer_box>"
+			"    <weight=36% input_box>"
+			"    | <weight=36% output_box>"
+			"    | <answer_box>"
 			"  >"
 			"  <weight=5>"
 			">"
@@ -609,7 +744,6 @@ namespace overseer_gui
 		img_logo.open(overseer_rc::k_overseer_bmp, overseer_rc::k_overseer_bmp_size);
 		pic_logo_.load(img_logo);
 		pic_logo_.stretchable(false);
-		pic_logo_.transparent(true); // without setting this, the border line for easter egg won't show
 		pic_logo_.align(align::center, align_v::center);
 
 		// widget initiation - label
@@ -676,12 +810,10 @@ namespace overseer_gui
 
 				// add a border to logo picture
 				// bgcolor() doesn't work here (for example: pic_logo_.bgcolor(color_rgb(0x800080));)
-				drawing dw(*this);
-				dw.draw([pos = this->pic_logo_.pos()](paint::graphics& graph) {
-					graph.rectangle(
-						rectangle(pos, nana::size{ 68, 68 }), false, color_rgb(0x800080));
-					graph.rectangle(
-						rectangle(pos + point{ 1, 1 }, nana::size{ 66, 66 }), false, color_rgb(0x800080));
+				drawing dw(this->pic_logo_);
+				dw.draw([](paint::graphics& graph) {
+					graph.rectangle({ 0, 0, 68, 68 }, false, color_rgb(0x800080));
+					graph.rectangle({ 1, 1, 66, 66 }, false, color_rgb(0x800080));
 				});
 				dw.update();
 				
@@ -740,16 +872,16 @@ namespace overseer_gui
 		};
 
 		auto a_timer = std::make_shared<timer>();
-		a_timer->interval(20);
-		a_timer->elapse([this, index = pos, interval = a_timer->interval(), &func_color_level] {
-			auto& time = this->timers_tabbar_color_animation_[index].elapsed_time;
+		a_timer->interval(k_ms_time_gui_timer_interval);
+		a_timer->elapse([this, pos, interval = a_timer->interval(), &func_color_level](const nana::arg_elapse&) {
+			auto& time = this->timers_tabbar_color_animation_[pos].elapsed_time;
 			this->tabbar_.tab_bgcolor(
-				index,
+				pos,
 				color(color_rgb(0xff8c00)).blend(colors::white, func_color_level(time)) // #ff8c00 dark orange
 			);
 			time += interval;
 			if (time >= 1600)
-				this->_remove_timer_tabbar_color_animation(index);
+				this->_remove_timer_tabbar_color_animation(pos);
 		});
 
 		auto& timer_data = timers_tabbar_color_animation_[pos];

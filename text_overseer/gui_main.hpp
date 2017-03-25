@@ -22,6 +22,9 @@ namespace overseer_gui
 	constexpr int k_max_count_read_file = 3;
 	constexpr int k_max_count_try_to_update_widget = 5;
 	constexpr int k_max_count_check_last_file_write = 5;
+	constexpr int k_ms_time_gui_timer_interval = 20;
+
+	nana::color line_num_default_color(unsigned int);
 
 	class AbstractBoxUnit : public nana::panel<false>
 	{
@@ -29,16 +32,31 @@ namespace overseer_gui
 		AbstractBoxUnit(nana::window wd);
 		virtual ~AbstractBoxUnit() = default;
 
+		void refresh_textbox_line_num() noexcept
+		{
+			nana::API::refresh_window(line_num_);
+		}
+
 		virtual bool update_label_state() noexcept = 0;
 
 	protected:
-		virtual void _make_textbox_popup_menu();
+		void _make_textbox_line_num() noexcept;
 
 		nana::place place_{ *this };
 		nana::label lab_name_{ *this };
 		nana::label lab_state_{ *this, u8"상태" };
+		nana::panel<true> line_num_{ *this };
 		nana::textbox textbox_{ *this };
 		nana::menu popup_menu_;
+
+		std::function<nana::color(unsigned int)> line_num_color_func_{
+			[](unsigned int) { return nana::colors::antique_white; }
+		};
+
+	private:
+		void _make_textbox_popup_menu();
+
+		nana::timer line_num_refresh_timer_;
 	};
 
 	class AnswerTextBoxUnit : public AbstractBoxUnit
@@ -110,15 +128,31 @@ namespace overseer_gui
 		std::string text_backup_u8_;
 	};
 
+	class IOFilesTabPage;
+
 	class OutputFileBoxUnit : public AbstractIOFileBoxUnit
 	{
 	public:
-		OutputFileBoxUnit(nana::window wd);
+		explicit OutputFileBoxUnit(IOFilesTabPage& parent_tab_page);
 
-		bool format_by_diff_between_answer(const std::string& answer);
+		virtual bool read_file() override;
+
+		enum class line_diff_sign
+		{
+			done,
+			error,
+			file_is_shorter
+		};
+		line_diff_sign line_diff_between_answer(const std::string& answer);
 
 	protected:
 		virtual bool _write_file() noexcept override { return false; }
+
+	private:
+		bool did_line_diff_{ false };
+		std::vector<bool> line_diff_results_;
+
+		std::function<bool()> call_tab_page_line_diff_func_;
 	};
 
 	class IOFilesTabPage : public nana::panel<true>
@@ -129,6 +163,18 @@ namespace overseer_gui
 		bool is_same_files(const std::wstring& input_filename, const std::wstring& output_filename) const noexcept
 		{
 			return input_box_.is_same_file(input_filename) && output_box_.is_same_file(output_filename);
+		}
+
+		bool output_box_line_diff()
+		{
+			switch (output_box_.line_diff_between_answer(answer_box_.textbox_caption()))
+			{
+			case OutputFileBoxUnit::line_diff_sign::done:
+				return true;
+			case OutputFileBoxUnit::line_diff_sign::file_is_shorter:
+				return true;
+			}
+			return false;
 		}
 
 		void register_files(std::wstring input_filename, std::wstring output_filename)
@@ -144,11 +190,9 @@ namespace overseer_gui
 
 		bool update_io_file_box_state() noexcept
 		{
-			auto state_input = input_box_.update_label_state();
-			auto state_output = output_box_.update_label_state();
-			if (state_output)
-				output_box_.format_by_diff_between_answer(answer_box_.textbox_caption());
-			return state_input || state_output;
+			auto input_state = input_box_.update_label_state();
+			auto output_state = output_box_.update_label_state();
+			return input_state || output_state;
 		}
 
 	protected:
