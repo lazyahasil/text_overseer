@@ -88,10 +88,10 @@ namespace file_io
 				else if (sizeof(buf[0]) != 1) // buffer type size != 1, 2
 					throw std::runtime_error("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
 			}
-			auto bom_length = file_.tellg();
-			auto size = static_cast<std::size_t>(stream_size() - bom_length); // byte size
-			auto sequence_length = do_write_16_bit ? (size / 2 + size % 2) : size; // length of the buffer sequence
-			if (buf_size < size)
+			const auto bom_length = file_.tellg();
+			const auto byte_size = static_cast<std::size_t>(stream_size() - bom_length);
+			const auto sequence_length = do_write_16_bit ? (byte_size / 2 + byte_size % 2) : byte_size;
+			if (buf_size < byte_size)
 			{
 				if (is_resizable)
 					_resize_buf(buf, sequence_length);
@@ -99,7 +99,7 @@ namespace file_io
 					throw std::length_error("data size is larger than the buffer size");
 			}
 			file_.seekg(bom_length, std::ios::beg);
-			file_.read(reinterpret_cast<unsigned char*>(&buf[0]), size);
+			file_.read(reinterpret_cast<unsigned char*>(&buf[0]), byte_size);
 			// when encoding is system, check if it's UTF-8 without BOM, within certain bytes of string
 			if (file_locale_ == encoding::system)
 			{
@@ -135,7 +135,6 @@ namespace file_io
 				if (!_write_file_check())
 					return false;
 			}
-
 			file_.write(reinterpret_cast<const unsigned char*>(&buf[0]), byte_length);
 			return true;
 		}

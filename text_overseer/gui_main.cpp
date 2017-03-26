@@ -38,10 +38,9 @@ namespace overseer_gui
 
 	void AbstractBoxUnit::_make_textbox_line_num() noexcept
 	{
-		drawing{ line_num_ }.draw([this](paint::graphics& graph)
-		{
-			//Returns the text position of each line that currently displays on screen.
-			auto text_pos = this->textbox_.text_position();
+		drawing{ line_num_ }.draw([this](paint::graphics& graph) {
+			const auto text_pos = this->textbox_.text_position();
+
 			if (text_pos.empty())
 				return;
 
@@ -49,11 +48,10 @@ namespace overseer_gui
 			unsigned int log10_num = 0;
 			while ((largest_num /= 10) != 0)
 				log10_num++;
-			unsigned int width = log10_num * 8 + 15;
+			const unsigned int width = log10_num * 8 + 15;
 
 			if (this->textbox_.edited() && width != graph.width())
 			{
-				//Change the weight of 'line' field.
 				std::stringstream ss;
 				ss << "weight=" << width;
 				this->place_.modify("line_num", ss.str().c_str());
@@ -61,13 +59,13 @@ namespace overseer_gui
 			}
 
 			int top = this->textbox_.text_area().y;
-			unsigned int inner_width = width - 4;
-			unsigned int line_height = this->textbox_.line_pixels();
+			const unsigned int inner_width = width - 4;
+			const unsigned int line_height = this->textbox_.line_pixels();
 
 			for (const auto& pos : text_pos)
 			{
-				auto num_wstr = std::to_wstring(pos.y + 1);
-				auto pixels = graph.text_extent_size(num_wstr).width;
+				const auto num_wstr = std::to_wstring(pos.y + 1);
+				const auto pixels = graph.text_extent_size(num_wstr).width;
 				graph.rectangle({ 2, top, inner_width, line_height }, true, this->line_num_color_func_(pos.y));
 				graph.string({ static_cast<int>(inner_width - pixels), top }, num_wstr);
 				top += line_height;
@@ -79,6 +77,7 @@ namespace overseer_gui
 		textbox_.events().mouse_wheel([this] {
 			this->refresh_textbox_line_num();
 		}); // mouse wheel does effect even when it's not focused
+
 		textbox_.events().resized([this] {
 			this->refresh_textbox_line_num();
 		});
@@ -160,7 +159,7 @@ namespace overseer_gui
 
 	bool AbstractIOFileBoxUnit::update_label_state() noexcept
 	{
-		auto file_is_changed = _check_last_write_time();
+		const auto file_is_changed = _check_last_write_time();
 
 		if (file_is_changed)
 		{
@@ -170,6 +169,7 @@ namespace overseer_gui
 			{
 				try
 				{
+					// read the file
 					did_read_file = read_file();
 				}
 				catch (std::exception& e)
@@ -196,14 +196,13 @@ namespace overseer_gui
 			return false;
 		}
 
-		auto term = std::chrono::system_clock::now() - last_write_time_;
+		const auto term = std::chrono::system_clock::now() - last_write_time_;
 		auto str = file_system::time_duration_to_string(
 			std::chrono::duration_cast<std::chrono::seconds>(term),
 			true,
 			file_system::time_period_strings::k_korean_u8
-		);
-		str += u8"전";
-		lab_state_.caption(str);
+		) + u8"전";
+		lab_state_.caption(std::move(str));
 
 		refresh_textbox_line_num();
 
@@ -242,14 +241,14 @@ namespace overseer_gui
 			return false;
 		}
 
-		auto locale = file_.locale();
+		const auto locale = file_.locale();
 
 		if (locale == FileIO::encoding::system) // ANSI
-			textbox_.caption(charset(str).to_bytes(unicode::utf8));
+			textbox_.caption(charset(std::move(str)).to_bytes(unicode::utf8));
 		else if (locale == FileIO::encoding::utf16_le) // UTF-16LE
-			textbox_.caption(charset(str, unicode::utf16).to_bytes(unicode::utf8));
+			textbox_.caption(charset(std::move(str), unicode::utf16).to_bytes(unicode::utf8));
 		else // UTF-8
-			textbox_.caption(str);
+			textbox_.caption(std::move(str));
 
 		file_closer.close_safe(); // manual file close before unlock
 		lock.unlock(); // manual unlock before nana::combox::option()
@@ -292,7 +291,7 @@ namespace overseer_gui
 					ErrorHdr::priority::info,
 					ec.value(),
 					std::string("Cannot check the last write time - ")
-						+ charset(ec.message()).to_bytes(unicode::utf8),
+					+ charset(ec.message()).to_bytes(unicode::utf8),
 					wstr_to_utf8(file_.filename())
 				);
 				last_write_time_is_vaild_ = false;
@@ -630,6 +629,7 @@ namespace overseer_gui
 		const auto a_lines_size = a_lines.size();
 		std::size_t i, j;
 
+		// loop for lines
 		for (i = 0, j = 0; i < f_lines_size && j < a_lines_size; i++, j++)
 		{
 			if (f_lines[i].begin() == f_lines[i].end())
@@ -648,15 +648,16 @@ namespace overseer_gui
 			boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" ")));
 
 			auto line_is_different = false;
-			auto f_words_size = f_words.size();
-			auto a_words_size = a_words.size();
+			const auto f_words_size = f_words.size();
+			const auto a_words_size = a_words.size();
 			std::size_t k, l;
 
+			// loop for words
 			for (k = 0, l = 0; k < f_words_size && l < a_words_size; k++, l++)
 			{
 				boost::string_view f_sv, a_sv;
 
-				if (f_words[k].size() == 0 && a_words[l].size() == 0)
+				if (f_words[k].size() == 0 && a_words[l].size() == 0) // prevent an infinite loop
 					continue;
 
 				if (f_words[k].size() != 0)
@@ -718,6 +719,7 @@ namespace overseer_gui
 		auto f_rest_lines_size = f_lines_size - i;
 		if (f_rest_lines_size && boost::ends_with(file_str, "\n\r"))
 			f_rest_lines_size--;
+
 		for (i = 0; i < f_rest_lines_size; i++)
 			line_diff_results_.push_back(false);
 
@@ -804,6 +806,8 @@ namespace overseer_gui
 		lab_welcome_.format(true);
 
 		// initiation of tap pages
+		tabbar_.toolbox(tabbar<std::string>::kits::scroll, true);
+		tabbar_.toolbox(tabbar<std::string>::kits::list, true);
 		_search_io_files();
 
 		// make events and etc.
@@ -821,7 +825,7 @@ namespace overseer_gui
 		page->register_files(input_filename, output_filename);
 		place_["tab_frame"].fasten(*page);
 		tabbar_.push_back(std::move(tab_name_u8));
-		auto pos = io_tab_pages_.size();
+		const auto pos = io_tab_pages_.size();
 		tabbar_.attach(pos, *page);
 		tabbar_.tab_bgcolor(pos, colors::white);
 		io_tab_pages_.push_back(std::move(page));
@@ -856,6 +860,7 @@ namespace overseer_gui
 
 			msgbox mb(*this, u8"디버깅 시작", msgbox::yes_no);
 			mb.icon(msgbox::icon_question) << u8"로그 파일에 디버깅 정보를 기록하시겠습니까?";
+
 			if (mb() == msgbox::pick_yes)
 			{
 				// modify the form's title
@@ -891,7 +896,11 @@ namespace overseer_gui
 		// trying to unload MainWindow => msgbox
 		this->events().unload([this](const arg_unload& arg) {
 			msgbox mb(*this, u8"프로그램 종료", msgbox::yes_no);
-			mb.icon(msgbox::icon_question) << u8"정말로 종료하시겠습니까?";
+			mb.icon(msgbox::icon_question);
+			mb << u8"정말로 종료하시겠습니까?";
+			if (arg.cancel = (mb() == msgbox::pick_no))
+				return;
+			mb << u8"\n저장하지 않은 정보는 손실될 수 있습니다!\n\n종료하려면 '예'를 누르세요.";
 			arg.cancel = (mb() == msgbox::pick_no);
 		});
 	}
@@ -955,7 +964,7 @@ namespace overseer_gui
 	void MainWindow::_search_io_files() noexcept
 	{
 		// preserve the condition of timer_io_tab_state_
-		auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
+		const auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
 		timer_io_tab_state_.stop();
 
 		// _remove_timer_tabbar_color_animation() for all timers_tabbar_color_animation_
@@ -983,6 +992,7 @@ namespace overseer_gui
 		for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 		{
 			auto are_already_in_tabs = false;
+
 			for (std::size_t j = 0; j < file_pairs.size(); j++)
 			{
 				if (io_tab_pages_[i]->is_same_files(file_pairs[j].first, file_pairs[j].second))
@@ -1008,8 +1018,8 @@ namespace overseer_gui
 		// get the folder names and _create_io_tab_page()
 		for (auto& file_pair : file_pairs)
 		{
-			auto before_last_slash = file_pair.first.find_last_of(L"/\\") - 1;
-			auto after_second_last_slash = file_pair.first.find_last_of(L"/\\", before_last_slash) + 1;
+			const auto before_last_slash = file_pair.first.find_last_of(L"/\\") - 1;
+			const auto after_second_last_slash = file_pair.first.find_last_of(L"/\\", before_last_slash) + 1;
 			auto folder_wstr = file_pair.first.substr(
 				after_second_last_slash,
 				before_last_slash - after_second_last_slash + 1
@@ -1017,12 +1027,13 @@ namespace overseer_gui
 			if (folder_wstr.empty())
 				folder_wstr = L"root";
 			_create_io_tab_page(
-				charset(folder_wstr).to_bytes(unicode::utf8),
+				charset(std::move(folder_wstr)).to_bytes(unicode::utf8),
 				std::move(file_pair.first),
 				std::move(file_pair.second)
 			);
 		}
 
+		// update nana::place
 		place_.collocate();
 
 		// restore the condition of timer_io_tab_state_

@@ -19,9 +19,9 @@ namespace file_io
 
 	long long FileIO::stream_size()
 	{
-		auto origin_pos = file_.tellg();
+		const auto origin_pos = file_.tellg();
 		file_.seekg(0, std::ios::end);
-		auto file_size = static_cast<long long>(file_.tellg());
+		const auto file_size = static_cast<long long>(file_.tellg());
 		file_.seekg(origin_pos, std::ios::beg);
 		return file_size;
 	}
@@ -39,7 +39,7 @@ namespace file_io
 		std::array<unsigned char, 3> buf;
 		if (!_read_file_check())
 			return encoding::unknown;
-		auto file_size = stream_size();
+		const auto file_size = stream_size();
 		file_.seekg(0, std::ios::beg);
 		if (file_size > 1)
 		{
@@ -71,7 +71,7 @@ namespace file_io
 
 	bool FileIO::update_locale_by_read_bom()
 	{
-		auto locale = read_bom();
+		const auto locale = read_bom();
 		if (locale == encoding::unknown) // failed
 			return false;
 		file_locale_ = locale;

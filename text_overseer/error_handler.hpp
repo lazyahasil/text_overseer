@@ -35,11 +35,11 @@ namespace error_handler
 				return;
 			try
 			{
-				FileIOClosingGuard file_closer(file_);
+				file_io::FileIOClosingGuard file_closer(file_);
 				file_.open(std::ios::app | std::ios::binary);
 				std::ostringstream stream;
 				stream << "[" << priority_str(p) << "] " << u8_str << " (" << error_code << ") ";
-				std::string msg = stream.str();
+				const std::string msg = stream.str();
 				file_.write_line(msg, msg.size());
 			}
 			catch (std::exception&)
@@ -60,11 +60,11 @@ namespace error_handler
 				return;
 			try
 			{
-				FileIOClosingGuard file_closer(file_);
+				file_io::FileIOClosingGuard file_closer(file_);
 				file_.open(std::ios::app | std::ios::binary);
 				std::ostringstream stream;
 				stream << "[" << priority_str(p) << "] " << u8_str << " (" << error_code << "): " << postfix_u8_str;
-				std::string msg = stream.str();
+				const std::string msg = stream.str();
 				file_.write_line(msg, msg.size());
 			}
 			catch (std::exception&)
