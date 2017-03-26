@@ -1,4 +1,6 @@
 # 텍스트 입출력 파일 감시기(Text I/O File Overseer)
+## 다운로드
+<https://github.com/lazyahasil/text_overseer/releases>
 ## 스크린샷
 ![Screenshot](/screenshots/text_overseer_0301.gif)
 ## 언어 및 컴파일러
