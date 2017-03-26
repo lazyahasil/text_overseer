@@ -1,6 +1,6 @@
 # 텍스트 입출력 파일 감시기(Text I/O File Overseer)
 ## 스크린샷
-![Screenshot](/text_overseer_0301.gif)
+![Screenshot](/screenshots/text_overseer_0301.gif)
 ## 언어 및 컴파일러
 * C++14
 * Microsoft Visual Studio 2015 Community
