@@ -2,7 +2,7 @@
 ## 다운로드
 <https://github.com/lazyahasil/text_overseer/releases>
 ## 스크린샷
-![Screenshot](/screenshots/text_overseer_0301.gif)
+![Screenshot](/screenshots/text_overseer_0311.gif)
 ## 언어 및 컴파일러
 * C++14
 * Microsoft Visual Studio 2015 Community

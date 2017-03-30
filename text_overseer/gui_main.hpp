@@ -46,8 +46,13 @@ namespace overseer_gui
 	protected:
 		virtual nana::color _line_num_color(unsigned int) noexcept { return nana::colors::antique_white; }
 		void _make_textbox_line_num() noexcept;
-		virtual void _post_textbox_edited() noexcept { }
-		virtual void _reset_textbox_edited() noexcept { textbox_.edited_reset(); }
+		virtual void _post_textbox_edited(bool is_edited) noexcept { };
+
+		virtual void _reset_textbox_edited() noexcept
+		{
+			refresh_textbox_line_num();
+			textbox_.edited_reset();
+		}
 
 		nana::place place_{ *this };
 		nana::label lab_name_{ *this };
@@ -73,7 +78,7 @@ namespace overseer_gui
 		std::string textbox_caption() { return textbox_.caption(); }
 
 	protected:
-		virtual void _post_textbox_edited() noexcept;
+		virtual void _post_textbox_edited(bool is_edited) noexcept override;
 
 	private:
 		IOFilesTabPage* tab_page_ptr_{ nullptr };
@@ -120,7 +125,7 @@ namespace overseer_gui
 		virtual bool read_file() override;
 
 	protected:
-		virtual void _post_textbox_edited() noexcept override;
+		virtual void _post_textbox_edited(bool is_edited) noexcept override;
 		virtual void _reset_textbox_edited() noexcept override;
 		virtual bool _write_file() override;
 
@@ -129,7 +134,7 @@ namespace overseer_gui
 	private:
 		void _restore_opened_file_to_utf8(); // call it when failed to write; the file_ must be opened for writing
 
-		bool textbox_is_edited_{ false };
+		bool did_post_edited_{ false };
 		std::string text_backup_u8_;
 	};
 

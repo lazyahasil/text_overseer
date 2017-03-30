@@ -7,6 +7,7 @@
 #include "error_handler.hpp"
 #include "overseer_rc.hpp"
 
+#include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <boost/utility/string_view.hpp>
 
@@ -40,10 +41,10 @@ namespace overseer_gui
 		// make gui refresh timer
 		gui_refresh_timer_.interval(k_ms_time_gui_timer_interval);
 		gui_refresh_timer_.elapse([this](const nana::arg_elapse&) {
+			if (this->textbox_.edited())
+				this->_post_textbox_edited(true);
 			if (this->textbox_.focused())
 				this->refresh_textbox_line_num();
-			if (this->textbox_.edited())
-				this->_post_textbox_edited();
 		});
 		gui_refresh_timer_.start();
 	}
@@ -62,7 +63,8 @@ namespace overseer_gui
 				log10_num++;
 			const unsigned int width = log10_num * 8 + 15;
 
-			if (this->textbox_.edited() && width != graph.width())
+			const auto current_width = graph.width();
+			if (current_width != 0 && current_width != width)
 			{
 				std::stringstream ss;
 				ss << "weight=" << width;
@@ -78,7 +80,7 @@ namespace overseer_gui
 			{
 				const auto num_wstr = std::to_wstring(pos.y + 1);
 				const auto pixels = graph.text_extent_size(num_wstr).width;
-				graph.rectangle({ 2, top, inner_width, line_height }, true, _line_num_color(pos.y));
+				graph.rectangle({ 2, top, inner_width, line_height }, true, this->_line_num_color(pos.y));
 				graph.string({ static_cast<int>(inner_width - pixels), top }, num_wstr);
 				top += line_height;
 			}
@@ -140,17 +142,18 @@ namespace overseer_gui
 		place_["lab_state"] << lab_state_;
 
 		lab_name_.caption(u8"<size=11>정답 출력</>");
-		lab_state_.caption(u8"출력 파일과 자동으로 비교합니다. "
-			u8"<bold>(실험 기능)</>");
 		lab_state_.format(true);
 
 		_make_textbox_line_num();
 	}
 
-	void AnswerTextBoxUnit::_post_textbox_edited() noexcept
+	void AnswerTextBoxUnit::_post_textbox_edited(bool is_edited) noexcept
 	{
-		tab_page_ptr_->output_box_line_diff();
-		_reset_textbox_edited();
+		if (is_edited)
+		{
+			tab_page_ptr_->output_box_line_diff();
+			_reset_textbox_edited();
+		}
 	}
 
 	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
@@ -263,13 +266,7 @@ namespace overseer_gui
 			textbox_.caption(std::move(str));
 
 		_reset_textbox_edited();
-
-		file_closer.close_safe(); // manual file close before unlock
-		lock.unlock(); // manual unlock before nana::combox::option()
-
-		// In mutex lock situation, it will cause nana gui exception(busy device).
-		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
-		combo_locale_.option(static_cast<std::size_t>(locale));
+		combo_locale_.option(static_cast<std::size_t>(locale)); // event won't happen because of mutex lock
 		return true;
 	}
 
@@ -339,6 +336,8 @@ namespace overseer_gui
 				if (lock)
 				{
 					file_.locale(static_cast<FileIO::encoding>(arg_combo.widget.option()));
+					lock.unlock(); // InputFileBoxUnit::_post_textbox_edited() uses the mutex lock too
+					this->_post_textbox_edited(true);
 					break;
 				}
 			}
@@ -420,18 +419,18 @@ namespace overseer_gui
 		return true;
 	}
 
-	void InputFileBoxUnit::_post_textbox_edited() noexcept
+	void InputFileBoxUnit::_post_textbox_edited(bool is_edited) noexcept
 	{
 		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
 
 		if (!lock)
 			return; // return if the file process is busy (fail trying to lock)
 
-		if (!textbox_is_edited_ && textbox_.edited())
+		if (!did_post_edited_ && is_edited)
 		{
 			btn_save_.bgcolor(colors::orange);
 			lab_name_.caption(lab_name_.caption() + &k_label_postfix_edited[0]);
-			textbox_is_edited_ = true;
+			did_post_edited_ = true;
 		}
 	}
 
@@ -447,7 +446,7 @@ namespace overseer_gui
 			return;
 		str.erase(pos, postfix_len);
 		lab_name_.caption(std::move(str));
-		textbox_is_edited_ = false;
+		did_post_edited_ = false;
 	}
 
 	bool InputFileBoxUnit::_write_file()
@@ -500,10 +499,10 @@ namespace overseer_gui
 				// restore the file from backup
 				_restore_opened_file_to_utf8();
 
+				combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
+
 				file_closer.close_safe(); // manual file close before unlock
 				lock.unlock(); // manual unlock before nana::combox::option()
-				// at the end of this function, there is a detailed explanation for the statement below
-				combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
 
 				// open a message box
 				msgbox mb(*this, u8"파일 쓰기 실패 (인코딩 오류)");
@@ -553,9 +552,10 @@ namespace overseer_gui
 			// restore the file from backup
 			_restore_opened_file_to_utf8();
 
+			combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
+
 			file_closer.close_safe(); // manual file close before unlock
 			lock.unlock(); // manual unlock before nana::combox::option()
-			combo_locale_.option(static_cast<std::size_t>(FileIO::encoding::utf8));
 
 			// open a message box
 			msgbox mb(*this, u8"파일 쓰기 실패");
@@ -568,13 +568,7 @@ namespace overseer_gui
 		}
 
 		_reset_textbox_edited();
-
-		file_closer.close_safe(); // manual file close before unlock
-		lock.unlock(); // manual unlock before nana::combox::option()
-
-		// In mutex lock situation, it will cause nana gui exception(busy device).
-		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
-		combo_locale_.option(static_cast<std::size_t>(locale));
+		combo_locale_.option(static_cast<std::size_t>(locale)); // event won't happen because of mutex lock
 		return true;
 	}
 
@@ -811,16 +805,28 @@ namespace overseer_gui
 
 	bool IOFilesTabPage::output_box_line_diff()
 	{
-		switch (output_box_.line_diff_between_answer(answer_box_.textbox_caption()))
+		const auto time_start = std::chrono::high_resolution_clock::now();
+		const auto result = output_box_.line_diff_between_answer(answer_box_.textbox_caption());
+		const auto time_end = std::chrono::high_resolution_clock::now();
+		std::ostringstream oss;
+
+		switch (result)
 		{
+		case OutputFileBoxUnit::line_diff_sign::error:
+			answer_box_.label_caption(u8"<size=8>위에 정답 출력을 입력하면, 자동으로 출력 파일과 비교합니다.</>");
+			return true;
 		case OutputFileBoxUnit::line_diff_sign::done:
-			answer_box_.label_caption(u8"비교가 끝났습니다.");
-			return true;
+			oss << u8"<green>비교가 끝났습니다.</>\n";
+			break;
 		case OutputFileBoxUnit::line_diff_sign::file_is_shorter:
-			answer_box_.label_caption(u8"<red>파일이 더 짧습니다!!</>");
-			return true;
+			oss << u8"<red>파일이 더 짧습니다!</>\n";
 		}
-		return false;
+
+		const auto time_count = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_start).count();
+		oss << u8"걸린 시간: " << time_count / 1000 << ".";
+		oss << std::setw(3) << std::setfill('0') << time_count % 1000 << u8" ms";
+		answer_box_.label_caption(oss.str());
+		return true;
 	}
 
 	MainWindow::MainWindow()
