@@ -3,6 +3,7 @@
 #include "file_system.hpp"
 #include "file_io.hpp"
 
+#include <array>
 #include <mutex>
 #include <nana/gui.hpp>
 #include <nana/gui/msgbox.hpp>
@@ -23,8 +24,11 @@ namespace overseer_gui
 	constexpr int k_max_count_try_to_update_widget = 5;
 	constexpr int k_max_count_check_last_file_write = 5;
 	constexpr int k_ms_time_gui_timer_interval = 20;
+	constexpr std::array<char, 24> k_label_postfix_edited{ " <color=0xff4500>(*)</>" };
 
 	nana::color line_num_default_color(unsigned int);
+
+	class IOFilesTabPage;
 
 	class AbstractBoxUnit : public nana::panel<false>
 	{
@@ -40,7 +44,10 @@ namespace overseer_gui
 		virtual bool update_label_state() noexcept = 0;
 
 	protected:
+		virtual nana::color _line_num_color(unsigned int) noexcept { return nana::colors::antique_white; }
 		void _make_textbox_line_num() noexcept;
+		virtual void _post_textbox_edited() noexcept { }
+		virtual void _reset_textbox_edited() noexcept { textbox_.edited_reset(); }
 
 		nana::place place_{ *this };
 		nana::label lab_name_{ *this };
@@ -49,25 +56,27 @@ namespace overseer_gui
 		nana::textbox textbox_{ *this };
 		nana::menu popup_menu_;
 
-		std::function<nana::color(unsigned int)> line_num_color_func_{
-			[](unsigned int) { return nana::colors::antique_white; }
-		};
-
 	private:
 		void _make_textbox_popup_menu();
 
-		nana::timer line_num_refresh_timer_;
+		nana::timer gui_refresh_timer_;
 	};
 
 	class AnswerTextBoxUnit : public AbstractBoxUnit
 	{
 	public:
-		AnswerTextBoxUnit(nana::window wd);
+		AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page);
 
 		bool update_label_state() noexcept override { return false; }
 		void label_caption(const std::string &str) { lab_state_.caption(str); }
 		void label_caption(std::string &&str) { lab_state_.caption(str); }
 		std::string textbox_caption() { return textbox_.caption(); }
+
+	protected:
+		virtual void _post_textbox_edited() noexcept;
+
+	private:
+		IOFilesTabPage* tab_page_ptr_{ nullptr };
 	};
 
 	class AbstractIOFileBoxUnit : public AbstractBoxUnit
@@ -78,15 +87,7 @@ namespace overseer_gui
 
 		virtual bool read_file();
 		virtual bool update_label_state() noexcept override;
-
-		bool is_same_file(const std::wstring& path_str) const noexcept
-		{
-			if (file_.filename_wstring() == path_str)
-				return true;
-			file_system::filesys::path own_path(file_.filename_wstring());
-			file_system::filesys::path param_path(path_str);
-			return own_path.compare(param_path) == 0;
-		}
+		bool is_same_file(const std::wstring& path_str) const noexcept;
 
 		template <class StringT>
 		void register_file(StringT&& file_path) noexcept
@@ -119,18 +120,18 @@ namespace overseer_gui
 		virtual bool read_file() override;
 
 	protected:
+		virtual void _post_textbox_edited() noexcept override;
+		virtual void _reset_textbox_edited() noexcept override;
 		virtual bool _write_file() override;
 
 		nana::button btn_save_{ *this, u8"저장" };
 
 	private:
-		// call it when failed to write; the file_ must be opened for writing
-		void _restore_opened_file_to_utf8();
+		void _restore_opened_file_to_utf8(); // call it when failed to write; the file_ must be opened for writing
 
+		bool textbox_is_edited_{ false };
 		std::string text_backup_u8_;
 	};
-
-	class IOFilesTabPage;
 
 	class OutputFileBoxUnit : public AbstractIOFileBoxUnit
 	{
@@ -148,13 +149,15 @@ namespace overseer_gui
 		line_diff_sign line_diff_between_answer(const std::string& answer);
 
 	protected:
+		virtual nana::color _line_num_color(unsigned int num) noexcept override;
 		virtual bool _write_file() noexcept override { return false; }
 
 	private:
+		void tab_page_line_diff_() noexcept;
+
 		bool did_line_diff_{ false };
 		std::vector<bool> line_diff_results_;
-
-		std::function<bool()> call_tab_page_line_diff_func_;
+		IOFilesTabPage* tab_page_ptr_{ nullptr };
 	};
 
 	class IOFilesTabPage : public nana::panel<true>
@@ -162,7 +165,10 @@ namespace overseer_gui
 	public:
 		IOFilesTabPage(nana::window wd);
 
-		bool is_same_files(const std::wstring& input_filename, const std::wstring& output_filename) const noexcept
+		bool is_same_files(
+			const std::wstring& input_filename,
+			const std::wstring& output_filename
+		) const noexcept
 		{
 			return input_box_.is_same_file(input_filename) && output_box_.is_same_file(output_filename);
 		}

@@ -33,7 +33,19 @@ namespace overseer_gui
 
 		line_num_.bgcolor(colors::gray);
 
+		API::eat_tabstop(textbox_, false);
+
 		_make_textbox_popup_menu();
+
+		// make gui refresh timer
+		gui_refresh_timer_.interval(k_ms_time_gui_timer_interval);
+		gui_refresh_timer_.elapse([this](const nana::arg_elapse&) {
+			if (this->textbox_.focused())
+				this->refresh_textbox_line_num();
+			if (this->textbox_.edited())
+				this->_post_textbox_edited();
+		});
+		gui_refresh_timer_.start();
 	}
 
 	void AbstractBoxUnit::_make_textbox_line_num() noexcept
@@ -66,7 +78,7 @@ namespace overseer_gui
 			{
 				const auto num_wstr = std::to_wstring(pos.y + 1);
 				const auto pixels = graph.text_extent_size(num_wstr).width;
-				graph.rectangle({ 2, top, inner_width, line_height }, true, this->line_num_color_func_(pos.y));
+				graph.rectangle({ 2, top, inner_width, line_height }, true, _line_num_color(pos.y));
 				graph.string({ static_cast<int>(inner_width - pixels), top }, num_wstr);
 				top += line_height;
 			}
@@ -81,13 +93,6 @@ namespace overseer_gui
 		textbox_.events().resized([this] {
 			this->refresh_textbox_line_num();
 		});
-
-		line_num_refresh_timer_.interval(k_ms_time_gui_timer_interval);
-		line_num_refresh_timer_.elapse([this](const nana::arg_elapse&) {
-			if (this->textbox_.focused())
-				this->refresh_textbox_line_num();
-		});
-		line_num_refresh_timer_.start();
 	}
 
 	void AbstractBoxUnit::_make_textbox_popup_menu()
@@ -115,7 +120,8 @@ namespace overseer_gui
 		});
 	}
 
-	AnswerTextBoxUnit::AnswerTextBoxUnit(window wd) : AbstractBoxUnit(wd)
+	AnswerTextBoxUnit::AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page)
+		: AbstractBoxUnit(parent_tab_page), tab_page_ptr_(&parent_tab_page)
 	{
 		place_.div(
 			"<vert "
@@ -134,11 +140,17 @@ namespace overseer_gui
 		place_["lab_state"] << lab_state_;
 
 		lab_name_.caption(u8"<size=11>정답 출력</>");
-		lab_state_.caption(u8"<size=8>출력 파일을 읽을 때 자동으로 비교합니다. "
-			u8"다시 읽기를 눌러도 됩니다. <bold>(실험 기능)</></>");
+		lab_state_.caption(u8"출력 파일과 자동으로 비교합니다. "
+			u8"<bold>(실험 기능)</>");
 		lab_state_.format(true);
 
 		_make_textbox_line_num();
+	}
+
+	void AnswerTextBoxUnit::_post_textbox_edited() noexcept
+	{
+		tab_page_ptr_->output_box_line_diff();
+		_reset_textbox_edited();
 	}
 
 	AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
@@ -250,6 +262,8 @@ namespace overseer_gui
 		else // UTF-8
 			textbox_.caption(std::move(str));
 
+		_reset_textbox_edited();
+
 		file_closer.close_safe(); // manual file close before unlock
 		lock.unlock(); // manual unlock before nana::combox::option()
 
@@ -257,6 +271,15 @@ namespace overseer_gui
 		// Because, after nana::combox::option(), nana tries to call the event, which is stuck at deadlock.
 		combo_locale_.option(static_cast<std::size_t>(locale));
 		return true;
+	}
+
+	bool AbstractIOFileBoxUnit::is_same_file(const std::wstring& path_str) const noexcept
+	{
+		if (file_.filename_wstring() == path_str)
+			return true;
+		file_system::filesys::path own_path(file_.filename_wstring());
+		file_system::filesys::path param_path(path_str);
+		return own_path.compare(param_path) == 0;
 	}
 
 	bool AbstractIOFileBoxUnit::_check_last_write_time() noexcept
@@ -328,7 +351,7 @@ namespace overseer_gui
 		place_.div(
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
-			"  <lab_name>"
+			"    <lab_name>"
 			"    <weight=70 btn_reload>"
 			//"    <weight=3>"
 			//"    <weight=25 btn_folder>"
@@ -395,6 +418,36 @@ namespace overseer_gui
 		}
 
 		return true;
+	}
+
+	void InputFileBoxUnit::_post_textbox_edited() noexcept
+	{
+		std::unique_lock<std::mutex> lock(file_mutex_, std::try_to_lock);
+
+		if (!lock)
+			return; // return if the file process is busy (fail trying to lock)
+
+		if (!textbox_is_edited_ && textbox_.edited())
+		{
+			btn_save_.bgcolor(colors::orange);
+			lab_name_.caption(lab_name_.caption() + &k_label_postfix_edited[0]);
+			textbox_is_edited_ = true;
+		}
+	}
+
+	void InputFileBoxUnit::_reset_textbox_edited() noexcept
+	{
+		// this function doesn't need mutex lock because it will be called from the read & write function
+		AbstractIOFileBoxUnit::_reset_textbox_edited();
+		btn_save_.bgcolor(colors::button_face);
+		auto str = lab_name_.caption();
+		const auto postfix_len = k_label_postfix_edited.size() - 1;
+		const auto pos = str.rfind(&k_label_postfix_edited[0], std::string::npos, postfix_len);
+		if (pos == std::string::npos)
+			return;
+		str.erase(pos, postfix_len);
+		lab_name_.caption(std::move(str));
+		textbox_is_edited_ = false;
 	}
 
 	bool InputFileBoxUnit::_write_file()
@@ -514,6 +567,8 @@ namespace overseer_gui
 			return false;
 		}
 
+		_reset_textbox_edited();
+
 		file_closer.close_safe(); // manual file close before unlock
 		lock.unlock(); // manual unlock before nana::combox::option()
 
@@ -538,13 +593,14 @@ namespace overseer_gui
 		}
 	}
 
-	OutputFileBoxUnit::OutputFileBoxUnit(IOFilesTabPage& parent_tab_page) : AbstractIOFileBoxUnit(parent_tab_page)
+	OutputFileBoxUnit::OutputFileBoxUnit(IOFilesTabPage& parent_tab_page)
+		: AbstractIOFileBoxUnit(parent_tab_page), tab_page_ptr_(&parent_tab_page)
 	{
 		// div
 		place_.div(
 			"<vert "
 			"  <weight=25 margin=[0,0,3,0]"
-			"  <lab_name>"
+			"    <lab_name>"
 			"    <weight=70 btn_reload>"
 			//"    <weight=3>"
 			//"    <weight=25 btn_folder>"
@@ -585,16 +641,6 @@ namespace overseer_gui
 
 		// etc.
 		_make_textbox_line_num();
-		line_num_color_func_ = [this](unsigned int num) {
-			if (!this->did_line_diff_ || num >= this->line_diff_results_.size())
-				return colors::antique_white;
-			if (line_diff_results_[num])
-				return colors::yellow_green;
-			return colors::orange_red;
-		};
-		call_tab_page_line_diff_func_ = [&parent_tab_page] {
-			return parent_tab_page.output_box_line_diff();
-		};
 	}
 
 	bool OutputFileBoxUnit::read_file()
@@ -602,7 +648,7 @@ namespace overseer_gui
 		if (!AbstractIOFileBoxUnit::read_file()) // call its parent class's method
 			return false;
 
-		call_tab_page_line_diff_func_();
+		tab_page_line_diff_();
 		return true;
 	}
 
@@ -729,6 +775,20 @@ namespace overseer_gui
 			return line_diff_sign::file_is_shorter;
 
 		return line_diff_sign::done;
+	}
+
+	color OutputFileBoxUnit::_line_num_color(unsigned int num) noexcept
+	{
+		if (!did_line_diff_ || num >= line_diff_results_.size())
+			return colors::antique_white;
+		if (line_diff_results_[num])
+			return colors::yellow_green;
+		return colors::orange_red;
+	}
+
+	void OutputFileBoxUnit::tab_page_line_diff_() noexcept
+	{
+		tab_page_ptr_->output_box_line_diff();
 	}
 
 	IOFilesTabPage::IOFilesTabPage(window wd) : panel<true>(wd)
