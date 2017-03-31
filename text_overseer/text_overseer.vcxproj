@@ -159,18 +159,19 @@
   <ItemGroup>
     <ClCompile Include="file_system.cpp" />
     <ClCompile Include="file_io.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="gui_box_unit.cpp" />
     <ClCompile Include="gui_main.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="error_handler.hpp" />
     <ClInclude Include="file_system.hpp" />
-    <ClInclude Include="gui_main.hpp" />
     <ClInclude Include="file_io.hpp" />
-    <ClInclude Include="overseer.hpp" />
-    <ClInclude Include="overseer_rc.hpp" />
+    <ClInclude Include="gui.hpp" />
+    <ClInclude Include="version.hpp" />
+    <ClInclude Include="resources.hpp" />
     <ClInclude Include="singleton.hpp" />
-    <ClInclude Include="misc_encoding.hpp" />
+    <ClInclude Include="encoding.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

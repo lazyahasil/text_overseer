@@ -27,6 +27,9 @@
     <ClCompile Include="gui_main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="gui_box_unit.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="file_system.hpp">
@@ -41,16 +44,16 @@
     <ClInclude Include="singleton.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="overseer_rc.hpp">
+    <ClInclude Include="resources.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="gui_main.hpp">
+    <ClInclude Include="version.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="overseer.hpp">
+    <ClInclude Include="encoding.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="misc_encoding.hpp">
+    <ClInclude Include="gui.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
