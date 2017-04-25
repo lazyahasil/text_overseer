@@ -25,7 +25,8 @@ namespace text_overseer
 		constexpr int k_max_count_read_file = 3;
 		constexpr int k_max_count_try_to_update_widget = 5;
 		constexpr int k_max_count_check_last_file_write = 5;
-		constexpr int k_ms_time_gui_timer_interval = 20;
+		constexpr int k_ms_gui_timer_interval = 20;
+		constexpr int k_ms_update_label_state_interval = 100;
 		constexpr std::array<char, 24> k_label_postfix_edited{ " <color=0xff4500>(*)</>" };
 
 		nana::color line_num_default_color(unsigned int);
@@ -48,7 +49,7 @@ namespace text_overseer
 		protected:
 			virtual nana::color _line_num_color(unsigned int) noexcept { return nana::colors::antique_white; }
 			void _make_textbox_line_num() noexcept;
-			virtual void _post_textbox_edited(bool is_edited) noexcept { };
+			virtual void _post_textbox_edited(bool is_edited) noexcept { }
 
 			virtual void _reset_textbox_edited() noexcept
 			{
@@ -161,7 +162,7 @@ namespace text_overseer
 			virtual bool _write_file() noexcept override { return false; }
 
 		private:
-			void tab_page_line_diff_() noexcept;
+			void _tab_page_line_diff() noexcept;
 
 			bool did_line_diff_{ false };
 			std::vector<bool> line_diff_results_;

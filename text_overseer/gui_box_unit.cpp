@@ -38,7 +38,7 @@ namespace text_overseer
 			_make_textbox_popup_menu();
 
 			// make gui refresh timer
-			gui_refresh_timer_.interval(k_ms_time_gui_timer_interval);
+			gui_refresh_timer_.interval(k_ms_gui_timer_interval);
 			gui_refresh_timer_.elapse([this](const nana::arg_elapse&) {
 				if (this->textbox_.edited())
 					this->_post_textbox_edited(true);
@@ -213,7 +213,7 @@ namespace text_overseer
 			const auto term = std::chrono::system_clock::now() - last_write_time_;
 			auto str = file_system::time_duration_to_string(
 				std::chrono::duration_cast<std::chrono::seconds>(term),
-				true,
+				false,
 				file_system::time_period_strings::k_korean_u8
 			) + u8"전";
 			lab_state_.caption(std::move(str));
@@ -644,7 +644,7 @@ namespace text_overseer
 			if (!AbstractIOFileBoxUnit::read_file()) // call its parent class's method
 				return false;
 
-			tab_page_line_diff_();
+			_tab_page_line_diff();
 			return true;
 		}
 
@@ -686,8 +686,8 @@ namespace text_overseer
 				}
 
 				std::vector<CIterRange> f_words, a_words;
-				boost::iter_split(f_words, f_lines[i], boost::token_finder(boost::is_any_of(" ")));
-				boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" ")));
+				boost::iter_split(f_words, f_lines[i], boost::token_finder(boost::is_any_of(" \t\r")));
+				boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" \t\r")));
 
 				auto line_is_different = false;
 				const auto f_words_size = f_words.size();
@@ -699,29 +699,24 @@ namespace text_overseer
 				{
 					boost::string_view f_sv, a_sv;
 
+					// check the sizes to prevent an exception when building boost::string_view objects
 					if (f_words[k].size() == 0 && a_words[l].size() == 0) // prevent an infinite loop
 						continue;
-
-					if (f_words[k].size() != 0)
-					{
-						f_sv = boost::string_view(&*f_words[k].begin(), f_words[k].size());
-					}
-					else
+					if (f_words[k].size() == 0)
 					{
 						l--;
 						continue;
 					}
-
-					if (a_words[l].size() != 0)
-					{
-						a_sv = boost::string_view(&*a_words[l].begin(), a_words[l].size());
-					}
-					else
+					if (a_words[l].size() == 0)
 					{
 						k--;
 						continue;
 					}
 
+					f_sv = boost::string_view(&*f_words[k].begin(), f_words[k].size());
+					a_sv = boost::string_view(&*a_words[l].begin(), a_words[l].size());
+
+					// comparison of two boost::string_view objects
 					if (f_sv != a_sv)
 					{
 						line_is_different = true;
@@ -729,6 +724,7 @@ namespace text_overseer
 					}
 				}
 
+				// check if there are remaining words not compared together
 				if (!line_is_different && k != f_words_size)
 				{
 					while (k < f_words_size)
@@ -752,16 +748,19 @@ namespace text_overseer
 					}
 				}
 
+				// push the result to line_diff_results_
 				if (line_is_different)
 					line_diff_results_.push_back(false);
 				else
 					line_diff_results_.push_back(true);
 			}
 
+			// calculate the remaining lines in the file
 			auto f_rest_lines_size = f_lines_size - i;
+			// exception for a newline at the end of the file
 			if (f_rest_lines_size && boost::ends_with(file_str, "\n\r"))
 				f_rest_lines_size--;
-
+			// push failed results for the remaining lines in the file
 			for (i = 0; i < f_rest_lines_size; i++)
 				line_diff_results_.push_back(false);
 
@@ -782,7 +781,7 @@ namespace text_overseer
 			return colors::orange_red;
 		}
 
-		void OutputFileBoxUnit::tab_page_line_diff_() noexcept
+		void OutputFileBoxUnit::_tab_page_line_diff() noexcept
 		{
 			tab_page_ptr_->output_box_line_diff();
 		}

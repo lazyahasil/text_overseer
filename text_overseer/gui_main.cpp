@@ -1,5 +1,7 @@
-﻿// std::copy() for char* in boost library(string.hpp) causes a MS complier error
+﻿// std::copy() for char* in boost library(string.hpp) causes an error by MS compliers
+#ifdef _MSC_VER
 #define _SCL_SECURE_NO_WARNINGS
+#endif
 
 #include "gui.hpp"
 #include "encoding.hpp"
@@ -46,7 +48,9 @@ namespace text_overseer
 			switch (result)
 			{
 			case OutputFileBoxUnit::line_diff_sign::error:
-				answer_box_.label_caption(u8"<size=8>위에 정답 출력을 입력하면, 자동으로 출력 파일과 비교합니다.</>");
+				answer_box_.label_caption(
+					u8"<size=8>위에 정답 출력을 입력하면, 자동으로 출력 파일과 비교합니다.</>"
+				);
 				return true;
 			case OutputFileBoxUnit::line_diff_sign::done:
 				oss << u8"<green>비교가 끝났습니다.</>\n";
@@ -55,7 +59,8 @@ namespace text_overseer
 				oss << u8"<red>파일이 더 짧습니다!</>\n";
 			}
 
-			const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_start).count();
+			const auto duration
+				= std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_start).count();
 			oss << u8"걸린 시간: " << duration / 1000 << ".";
 			oss << std::setw(3) << std::setfill('0') << duration % 1000 << u8" ms";
 			answer_box_.label_caption(oss.str());
@@ -120,6 +125,7 @@ namespace text_overseer
 			std::wstring output_filename
 		) noexcept
 		{
+			// this function was made in the light of the nana example(widget_show.cpp)
 			auto page = std::make_shared<IOFilesTabPage>(*this);
 			page->register_files(input_filename, output_filename);
 			place_["tab_frame"].fasten(*page);
@@ -134,7 +140,7 @@ namespace text_overseer
 		{
 			static bool was_called = false;
 
-			if (!was_called) // first call
+			if (!was_called) // first call: change the labels
 			{
 				std::string str;
 
@@ -151,9 +157,8 @@ namespace text_overseer
 				// set flag to get this doing once
 				was_called = true;
 			}
-			else // second call
+			else // second call: start debugging to a log file
 			{
-				// start debugging to a log file
 				if (ErrorHdr::instance().is_started())
 					return;
 
@@ -165,7 +170,7 @@ namespace text_overseer
 					// modify the form's title
 					this->caption(this->caption() + " (debug mode)");
 
-					// add a border to logo picture
+					// add a border to the logo picture
 					// bgcolor() doesn't work here (for example: pic_logo_.bgcolor(color_rgb(0x800080));)
 					drawing dw(this->pic_logo_);
 					dw.draw([](paint::graphics& graph) {
@@ -214,7 +219,7 @@ namespace text_overseer
 						this->_make_tabbar_color_animation(i);
 				}
 			});
-			timer_io_tab_state_.interval(100);
+			timer_io_tab_state_.interval(k_ms_update_label_state_interval);
 			timer_io_tab_state_.start();
 		}
 
@@ -233,11 +238,11 @@ namespace text_overseer
 			};
 
 			auto a_timer = std::make_shared<timer>();
-			a_timer->interval(k_ms_time_gui_timer_interval);
+			a_timer->interval(k_ms_gui_timer_interval);
 			a_timer->elapse([this, pos, interval = a_timer->interval(), &func_color_level](const nana::arg_elapse&) {
 				auto& time = this->tabbar_color_animations_[pos].elapsed_time;
 				color color_leveled(color_rgb(0xff8c00)); // #ff8c00 dark orange
-				color_leveled.blend(colors::white, func_color_level(time));
+				color_leveled = color_leveled.blend(colors::white, func_color_level(time));
 				this->tabbar_.tab_bgcolor(pos, color_leveled);
 				time += interval;
 				if (time >= 1600)

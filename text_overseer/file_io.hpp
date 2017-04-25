@@ -11,8 +11,9 @@ namespace text_overseer
 	{
 		namespace detail
 		{
-			// bytes size limit when checking that the file is UTF-8 without BOM
-			constexpr std::size_t k_max_size_check_utf8 = 0x400U;
+			// bytes size limit when checking if the file is UTF-8 without BOM
+			// (there may be a rare chance to check a big file with ANSI or UTF-8 without BOM)
+			constexpr std::size_t k_max_size_check_utf8 = 0x800U;
 
 			namespace bom // Byte Order Mark
 			{
@@ -82,17 +83,26 @@ namespace text_overseer
 			{
 				if (!update_locale_by_read_bom()) // includes _read_file_check()
 					return 0U;
-				auto do_write_16_bit = false;
-				if (file_locale_ == encoding::utf16_le)
+
+				// check the byte size of the buffer type (because of resizing)
+				auto do_use_16_bit_buffer = false;
+				if (file_locale_ == encoding::utf16_le) // when reading UTF-16LE
 				{
 					if (sizeof(buf[0]) == 2)
-						do_write_16_bit = true;
+						do_use_16_bit_buffer = true;
 					else if (sizeof(buf[0]) != 1) // buffer type size != 1, 2
 						throw std::runtime_error("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
 				}
+				else if (sizeof(buf[0]) != 1) // buffer type size != 1
+				{
+					throw std::runtime_error("a mutable byte(8-bit) sequence buffer is needed");
+				}
+
 				const auto bom_length = file_.tellg();
 				const auto byte_size = static_cast<std::size_t>(stream_size() - bom_length);
-				const auto sequence_length = do_write_16_bit ? (byte_size / 2 + byte_size % 2) : byte_size;
+				const auto sequence_length = do_use_16_bit_buffer ? (byte_size / 2 + byte_size % 2) : byte_size;
+
+				// resize the buffer
 				if (buf_size < byte_size)
 				{
 					if (is_resizable)
@@ -100,14 +110,17 @@ namespace text_overseer
 					else
 						throw std::length_error("data size is larger than the buffer size");
 				}
+
 				file_.seekg(bom_length, std::ios::beg);
 				file_.read(reinterpret_cast<unsigned char*>(&buf[0]), byte_size);
+
 				// when encoding is system, check if it's UTF-8 without BOM, within certain bytes of string
 				if (file_locale_ == encoding::system)
 				{
 					if (utf8_check_vaild(buf, k_max_size_check_utf8, true))
 						file_locale_ = encoding::utf8_no_bom;
 				}
+
 				return sequence_length;
 			}
 
@@ -148,8 +161,10 @@ namespace text_overseer
 				const ConstStringBuffer2& newline
 			)
 			{
+				// perform write_some()
 				if (!write_some(buf, byte_length))
 					return false;
+				// write a newline
 				file_.write(reinterpret_cast<const unsigned char*>(&newline[0]), newline.size());
 				return true;
 			}
@@ -185,21 +200,15 @@ namespace text_overseer
 			explicit FileIOClosingGuard() = delete;
 			explicit FileIOClosingGuard(FileIO& file_io) : file_io_(&file_io) { }
 
-			~FileIOClosingGuard()
-			{
-				if (file_io_ && !is_closed_)
-					file_io_->close();
-			}
+			~FileIOClosingGuard() { close_safe(); }
 
 			FileIOClosingGuard(const FileIOClosingGuard& src) = delete;
 			FileIOClosingGuard& operator=(const FileIOClosingGuard& rhs) = delete;
 
 			void close_safe() noexcept
 			{
-				if (is_closed_)
-					return;
+				// no need for check because std::basic_fstream<>::close() does check if closed
 				file_io_->close();
-				is_closed_ = true;
 			}
 
 		private:

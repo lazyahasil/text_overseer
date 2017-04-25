@@ -2,6 +2,6 @@
 
 namespace text_overseer
 {
-	constexpr char* k_version_str = "0.3.1.2";
-	constexpr wchar_t* k_version_num_wstr = L"0312";
+	constexpr char* k_version_str = "0.3.1.3";
+	constexpr wchar_t* k_version_num_wstr = L"0313";
 }

@@ -200,8 +200,6 @@ namespace text_overseer
 			remainder /= 24;
 			const auto days = remainder;
 
-			// a pointer to the period string
-			const PeriodStringT* period = nullptr;
 			// check if the duration is smaller than a base period
 			if ((counted == 0 && base_period == PeriodEnum::msecs)
 				|| (counted < 1000 && base_period == PeriodEnum::secs)
@@ -213,6 +211,8 @@ namespace text_overseer
 			StringT str;
 			auto did_eariler = false;
 
+			// build a string representing the time
+			// no need to add white spaces (see namespace time_period_strings)
 			if (days >= 1)
 			{
 				str = boost::lexical_cast<StringT>(days)
