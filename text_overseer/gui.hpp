@@ -29,14 +29,14 @@ namespace text_overseer
 		constexpr int k_ms_update_label_state_interval = 100;
 		constexpr std::array<char, 24> k_label_postfix_edited{ " <color=0xff4500>(*)</>" };
 
-		nana::color line_num_default_color(unsigned int);
+		const nana::color k_line_num_default_color = nana::colors::light_goldenrod_yellow;
 
 		class IOFilesTabPage;
 
 		class AbstractBoxUnit : public nana::panel<false>
 		{
 		public:
-			AbstractBoxUnit(nana::window wd);
+			AbstractBoxUnit(IOFilesTabPage& parent_tab_page);
 			virtual ~AbstractBoxUnit() = default;
 
 			void refresh_textbox_line_num() noexcept
@@ -47,7 +47,11 @@ namespace text_overseer
 			virtual bool update_label_state() noexcept = 0;
 
 		protected:
-			virtual nana::color _line_num_color(unsigned int) noexcept { return nana::colors::antique_white; }
+			virtual nana::color _line_num_color(unsigned int) noexcept
+			{
+				return k_line_num_default_color;
+			}
+
 			void _make_textbox_line_num() noexcept;
 			virtual void _post_textbox_edited(bool is_edited) noexcept { }
 
@@ -64,6 +68,8 @@ namespace text_overseer
 			nana::textbox textbox_{ *this };
 			nana::menu popup_menu_;
 
+			IOFilesTabPage* tab_page_ptr_{ nullptr };
+
 		private:
 			void _make_textbox_popup_menu();
 
@@ -75,22 +81,25 @@ namespace text_overseer
 		public:
 			AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page);
 
-			bool update_label_state() noexcept override { return false; }
 			void label_caption(const std::string &str) { lab_state_.caption(str); }
-			void label_caption(std::string &&str) { lab_state_.caption(str); }
+			void label_caption(std::string &&str) { lab_state_.caption(std::move(str)); }
+			void reset_line_count_of_file() { file_line_count_if_shorter_ = 0; }
+			void set_line_count_of_file(std::size_t count) { file_line_count_if_shorter_ = count; }
 			std::string textbox_caption() { return textbox_.caption(); }
+			bool update_label_state() noexcept override { return false; }
 
 		protected:
+			virtual nana::color _line_num_color(unsigned int num) noexcept override;
 			virtual void _post_textbox_edited(bool is_edited) noexcept override;
 
 		private:
-			IOFilesTabPage* tab_page_ptr_{ nullptr };
+			std::size_t file_line_count_if_shorter_{ 0 }; // will be used if not 0 and the output file is shorter
 		};
 
 		class AbstractIOFileBoxUnit : public AbstractBoxUnit
 		{
 		public:
-			AbstractIOFileBoxUnit(nana::window wd);
+			AbstractIOFileBoxUnit(IOFilesTabPage& parent_tab_page);
 			virtual ~AbstractIOFileBoxUnit() = default;
 
 			virtual bool read_file();
@@ -123,11 +132,16 @@ namespace text_overseer
 		class InputFileBoxUnit : public AbstractIOFileBoxUnit
 		{
 		public:
-			InputFileBoxUnit(nana::window wd);
+			InputFileBoxUnit(IOFilesTabPage& parent_tab_page);
 
 			virtual bool read_file() override;
 
 		protected:
+			virtual nana::color _line_num_color(unsigned int) noexcept override
+			{
+				return nana::colors::light_blue;
+			}
+
 			virtual void _post_textbox_edited(bool is_edited) noexcept override;
 			virtual void _reset_textbox_edited() noexcept override;
 			virtual bool _write_file() override;
@@ -149,24 +163,25 @@ namespace text_overseer
 
 			virtual bool read_file() override;
 
-			enum class line_diff_sign
+			// a simple enum class for line_diff_between_answer()'s return value
+			enum class line_diff_sign : int
 			{
-				done,
-				error,
-				file_is_shorter
+				done = 0,
+				error = -1,
 			};
-			line_diff_sign line_diff_between_answer(const std::string& answer);
+
+			// @returns done:	 0
+			//          error:	-1
+			//			the file is shorter than answer: the line count of the output file
+			int line_diff_between_answer(const std::string& answer);
 
 		protected:
 			virtual nana::color _line_num_color(unsigned int num) noexcept override;
 			virtual bool _write_file() noexcept override { return false; }
 
 		private:
-			void _tab_page_line_diff() noexcept;
-
 			bool did_line_diff_{ false };
 			std::vector<bool> line_diff_results_;
-			IOFilesTabPage* tab_page_ptr_{ nullptr };
 		};
 
 		class IOFilesTabPage : public nana::panel<true>
@@ -182,7 +197,7 @@ namespace text_overseer
 				return input_box_.is_same_file(input_filename) && output_box_.is_same_file(output_filename);
 			}
 
-			bool output_box_line_diff();
+			void output_box_line_diff();
 
 			void register_files(std::wstring input_filename, std::wstring output_filename)
 			{
@@ -225,6 +240,7 @@ namespace text_overseer
 			) noexcept;
 			void _easter_egg_logo() noexcept;
 			void _make_events() noexcept;
+			void _make_io_tabs_not_enabled_except_one(std::size_t pos) noexcept;
 			void _make_timer_io_tab_state() noexcept;
 			void _make_tabbar_color_animation(std::size_t pos) noexcept;
 			void _remove_tabbar_color_animation(std::size_t pos) noexcept;

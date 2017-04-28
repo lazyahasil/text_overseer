@@ -78,12 +78,15 @@ namespace text_overseer
 		private:
 			const char* priority_str(priority p) noexcept
 			{
-				if (p == priority::info)
+				switch (p)
+				{
+				case priority::info:
 					return "Information";
-				if (p == priority::warning)
+				case priority::warning:
 					return "Warning";
-				if (p == priority::critical)
+				case priority::critical:
 					return "Critical";
+				}
 				return "";
 			}
 

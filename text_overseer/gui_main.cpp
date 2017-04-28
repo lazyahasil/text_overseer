@@ -38,33 +38,41 @@ namespace text_overseer
 			place_["answer_box"] << answer_box_;
 		}
 
-		bool IOFilesTabPage::output_box_line_diff()
+		void IOFilesTabPage::output_box_line_diff()
 		{
 			const auto time_start = std::chrono::high_resolution_clock::now();
 			const auto result = output_box_.line_diff_between_answer(answer_box_.textbox_caption());
 			const auto time_end = std::chrono::high_resolution_clock::now();
+
 			std::ostringstream oss;
 
 			switch (result)
 			{
-			case OutputFileBoxUnit::line_diff_sign::error:
+			case static_cast<int>(OutputFileBoxUnit::line_diff_sign::error):
 				answer_box_.label_caption(
 					u8"<size=8>위에 정답 출력을 입력하면, 자동으로 출력 파일과 비교합니다.</>"
 				);
-				return true;
-			case OutputFileBoxUnit::line_diff_sign::done:
+				answer_box_.reset_line_count_of_file();
+				return;
+			case static_cast<int>(OutputFileBoxUnit::line_diff_sign::done) :
 				oss << u8"<green>비교가 끝났습니다.</>\n";
+				answer_box_.reset_line_count_of_file();
 				break;
-			case OutputFileBoxUnit::line_diff_sign::file_is_shorter:
+			default:
 				oss << u8"<red>파일이 더 짧습니다!</>\n";
+				answer_box_.set_line_count_of_file(static_cast<std::size_t>(result));
 			}
 
+			// add the duration string
 			const auto duration
 				= std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_start).count();
 			oss << u8"걸린 시간: " << duration / 1000 << ".";
 			oss << std::setw(3) << std::setfill('0') << duration % 1000 << u8" ms";
 			answer_box_.label_caption(oss.str());
-			return true;
+
+			// refresh line numbers
+			output_box_.refresh_textbox_line_num();
+			answer_box_.refresh_textbox_line_num();
 		}
 
 		MainWindow::MainWindow()
@@ -197,6 +205,10 @@ namespace text_overseer
 				this->_search_io_files();
 			});
 
+			tabbar_.events().activated([this](const arg_tabbar<std::string>& arg) {
+				_make_io_tabs_not_enabled_except_one(arg.widget.activated());
+			});
+
 			// trying to unload MainWindow => msgbox
 			this->events().unload([this](const arg_unload& arg) {
 				msgbox mb(*this, u8"프로그램 종료", msgbox::yes_no);
@@ -207,6 +219,23 @@ namespace text_overseer
 				mb << u8"\n저장하지 않은 정보는 손실될 수 있습니다!\n\n종료하려면 '예'를 누르세요.";
 				arg.cancel = (mb() == msgbox::pick_no);
 			});
+		}
+
+		void MainWindow::_make_io_tabs_not_enabled_except_one(std::size_t pos) noexcept
+		{
+			const auto tab_n = tabbar_.length();
+			for (std::size_t i = 0; i < tab_n; i++)
+			{
+				if (i == pos)
+				{
+					this->io_tab_pages_[i]->enabled(true);
+					API::refresh_window_tree(this->io_tab_pages_[i]->handle());
+				}
+				else
+				{
+					this->io_tab_pages_[i]->enabled(false);
+				}
+			}
 		}
 
 		void MainWindow::_make_timer_io_tab_state() noexcept
@@ -346,6 +375,9 @@ namespace text_overseer
 			// _make_tabbar_color_animation() for all tabs
 			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 				_make_tabbar_color_animation(i);
+
+			// make io tab pages not enabled except the activated one
+			_make_io_tabs_not_enabled_except_one(tabbar_.activated());
 		}
 	}
 }

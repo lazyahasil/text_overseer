@@ -91,11 +91,11 @@ namespace text_overseer
 					if (sizeof(buf[0]) == 2)
 						do_use_16_bit_buffer = true;
 					else if (sizeof(buf[0]) != 1) // buffer type size != 1, 2
-						throw std::runtime_error("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
+						throw std::invalid_argument("a mutable byte or 16-bit sequence buffer is needed for UTF-16LE");
 				}
 				else if (sizeof(buf[0]) != 1) // buffer type size != 1
 				{
-					throw std::runtime_error("a mutable byte(8-bit) sequence buffer is needed");
+					throw std::invalid_argument("a mutable byte(8-bit) sequence buffer is needed");
 				}
 
 				const auto bom_length = file_.tellg();

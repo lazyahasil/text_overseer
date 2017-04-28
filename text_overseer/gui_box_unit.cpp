@@ -18,12 +18,8 @@ namespace text_overseer
 
 	namespace gui
 	{
-		nana::color line_num_default_color(unsigned int)
-		{
-			return nana::colors::antique_white;
-		}
-
-		AbstractBoxUnit::AbstractBoxUnit(window wd) : panel<false>(wd)
+		AbstractBoxUnit::AbstractBoxUnit(IOFilesTabPage& parent_tab_page)
+			: panel<false>(parent_tab_page), tab_page_ptr_(&parent_tab_page)
 		{
 			lab_name_.format(true);
 			lab_name_.text_align(align::left, align_v::center);
@@ -53,17 +49,19 @@ namespace text_overseer
 			drawing{ line_num_ }.draw([this](paint::graphics& graph) {
 				const auto text_pos = this->textbox_.text_position();
 
+				// return if there's no text
 				if (text_pos.empty())
 					return;
 
 				auto largest_num = text_pos.back().y + 1;
-				unsigned int log10_num = 0;
-				while ((largest_num /= 10) != 0)
-					log10_num++;
+				unsigned int log10_num = static_cast<int>(std::log10(largest_num));
 				const unsigned int width = log10_num * 8 + 15;
 
+				// check whether the current width is suitable or not
+				// (and if the parent tab page is not currently enabled(activated),
+				//  an exception from std::vector<>::size() will be thrown to death in nana 1.4.1)
 				const auto current_width = graph.width();
-				if (current_width != 0 && current_width != width)
+				if (this->tab_page_ptr_->enabled() && current_width != 0 && current_width != width)
 				{
 					std::stringstream ss;
 					ss << "weight=" << width;
@@ -75,6 +73,7 @@ namespace text_overseer
 				const unsigned int inner_width = width - 4;
 				const unsigned int line_height = this->textbox_.line_pixels();
 
+				// draw the line numbers
 				for (const auto& pos : text_pos)
 				{
 					const auto num_wstr = std::to_wstring(pos.y + 1);
@@ -122,7 +121,7 @@ namespace text_overseer
 		}
 
 		AnswerTextBoxUnit::AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page)
-			: AbstractBoxUnit(parent_tab_page), tab_page_ptr_(&parent_tab_page)
+			: AbstractBoxUnit(parent_tab_page)
 		{
 			place_.div(
 				"<vert "
@@ -146,6 +145,13 @@ namespace text_overseer
 			_make_textbox_line_num();
 		}
 
+		color AnswerTextBoxUnit::_line_num_color(unsigned int num) noexcept
+		{
+			if (file_line_count_if_shorter_ != 0 && num >= file_line_count_if_shorter_)
+				return colors::orange_red;
+			return k_line_num_default_color;
+		}
+
 		void AnswerTextBoxUnit::_post_textbox_edited(bool is_edited) noexcept
 		{
 			if (is_edited)
@@ -155,7 +161,8 @@ namespace text_overseer
 			}
 		}
 
-		AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(window wd) : AbstractBoxUnit(wd)
+		AbstractIOFileBoxUnit::AbstractIOFileBoxUnit(IOFilesTabPage& parent_tab_page)
+			: AbstractBoxUnit(parent_tab_page)
 		{
 			// combo box order relys on FileIO::encoding
 			combo_locale_.push_back(u8"자동");
@@ -348,7 +355,8 @@ namespace text_overseer
 			});
 		}
 
-		InputFileBoxUnit::InputFileBoxUnit(window wd) : AbstractIOFileBoxUnit(wd)
+		InputFileBoxUnit::InputFileBoxUnit(IOFilesTabPage& parent_tab_page)
+			: AbstractIOFileBoxUnit(parent_tab_page)
 		{
 			// div
 			place_.div(
@@ -591,7 +599,7 @@ namespace text_overseer
 		}
 
 		OutputFileBoxUnit::OutputFileBoxUnit(IOFilesTabPage& parent_tab_page)
-			: AbstractIOFileBoxUnit(parent_tab_page), tab_page_ptr_(&parent_tab_page)
+			: AbstractIOFileBoxUnit(parent_tab_page)
 		{
 			// div
 			place_.div(
@@ -644,11 +652,11 @@ namespace text_overseer
 			if (!AbstractIOFileBoxUnit::read_file()) // call its parent class's method
 				return false;
 
-			_tab_page_line_diff();
+			tab_page_ptr_->output_box_line_diff();
 			return true;
 		}
 
-		OutputFileBoxUnit::line_diff_sign OutputFileBoxUnit::line_diff_between_answer(const std::string& answer)
+		int OutputFileBoxUnit::line_diff_between_answer(const std::string& answer)
 		{
 			// clear the result
 			did_line_diff_ = false;
@@ -658,12 +666,13 @@ namespace text_overseer
 			const auto file_str = textbox_.caption();
 
 			if (file_str.empty() || answer.empty())
-				return line_diff_sign::error;
+				return static_cast<int>(line_diff_sign::error);
 
+			// using typename CIterRange
 			using CIterRange = boost::iterator_range<std::string::const_iterator>;
-			std::vector<CIterRange> f_lines, a_lines;
-			std::string result;
 
+			// token iter split for lines
+			std::vector<CIterRange> f_lines, a_lines;
 			boost::iter_split(f_lines, file_str, boost::token_finder(boost::is_any_of("\n")));
 			boost::iter_split(a_lines, answer, boost::token_finder(boost::is_any_of("\n")));
 
@@ -674,37 +683,38 @@ namespace text_overseer
 			// loop for lines
 			for (i = 0, j = 0; i < f_lines_size && j < a_lines_size; i++, j++)
 			{
+				// ignore empty lines
 				if (f_lines[i].begin() == f_lines[i].end())
 				{
-					j--;
+					if (a_lines[j].begin() != a_lines[j].end()) // prevent an infinite loop
+						j--;
 					continue;
 				}
-				if (f_lines[j].begin() == f_lines[j].end())
+				if (a_lines[j].begin() == a_lines[j].end())
 				{
 					i--;
 					continue;
 				}
 
+				// token iter split for words
 				std::vector<CIterRange> f_words, a_words;
 				boost::iter_split(f_words, f_lines[i], boost::token_finder(boost::is_any_of(" \t\r")));
 				boost::iter_split(a_words, a_lines[i], boost::token_finder(boost::is_any_of(" \t\r")));
 
-				auto line_is_different = false;
 				const auto f_words_size = f_words.size();
 				const auto a_words_size = a_words.size();
 				std::size_t k, l;
 
+				auto line_is_different = false;
+
 				// loop for words
 				for (k = 0, l = 0; k < f_words_size && l < a_words_size; k++, l++)
 				{
-					boost::string_view f_sv, a_sv;
-
 					// check the sizes to prevent an exception when building boost::string_view objects
-					if (f_words[k].size() == 0 && a_words[l].size() == 0) // prevent an infinite loop
-						continue;
 					if (f_words[k].size() == 0)
 					{
-						l--;
+						if (a_words[l].size() != 0) // prevent an infinite loop
+							l--;
 						continue;
 					}
 					if (a_words[l].size() == 0)
@@ -713,8 +723,8 @@ namespace text_overseer
 						continue;
 					}
 
-					f_sv = boost::string_view(&*f_words[k].begin(), f_words[k].size());
-					a_sv = boost::string_view(&*a_words[l].begin(), a_words[l].size());
+					boost::string_view f_sv(&*f_words[k].begin(), f_words[k].size());
+					boost::string_view a_sv(&*a_words[l].begin(), a_words[l].size());
 
 					// comparison of two boost::string_view objects
 					if (f_sv != a_sv)
@@ -767,23 +777,18 @@ namespace text_overseer
 			did_line_diff_ = true;
 
 			if (f_lines_size < a_lines_size)
-				return line_diff_sign::file_is_shorter;
+				return f_lines_size;
 
-			return line_diff_sign::done;
+			return static_cast<int>(line_diff_sign::done);
 		}
 
 		color OutputFileBoxUnit::_line_num_color(unsigned int num) noexcept
 		{
 			if (!did_line_diff_ || num >= line_diff_results_.size())
-				return colors::antique_white;
+				return k_line_num_default_color;
 			if (line_diff_results_[num])
 				return colors::yellow_green;
 			return colors::orange_red;
-		}
-
-		void OutputFileBoxUnit::_tab_page_line_diff() noexcept
-		{
-			tab_page_ptr_->output_box_line_diff();
 		}
 	}
 }
