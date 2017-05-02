@@ -41,7 +41,7 @@ namespace text_overseer
 					file_.open(std::ios::app | std::ios::binary);
 					std::ostringstream oss;
 					oss << "[" << priority_str(p) << "] " << u8_str << " (" << error_code << ") ";
-					const std::string msg = oss.str();
+					const auto msg = oss.str();
 					file_.write_line(msg, msg.size());
 				}
 				catch (std::exception&)
@@ -66,7 +66,7 @@ namespace text_overseer
 					file_.open(std::ios::app | std::ios::binary);
 					std::ostringstream oss;
 					oss << "[" << priority_str(p) << "] " << u8_str << " (" << error_code << "): " << postfix_u8_str;
-					const std::string msg = oss.str();
+					const auto msg = oss.str();
 					file_.write_line(msg, msg.size());
 				}
 				catch (std::exception&)

@@ -174,7 +174,6 @@ namespace text_overseer
 		{
 			enum class PeriodEnum { msecs, secs, mins, hours, days } base_period;
 			const auto counted = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-			auto remainder = counted;
 
 			if (counted == 0)
 				return periods.just_a_moment;
@@ -190,6 +189,7 @@ namespace text_overseer
 			else
 				base_period = PeriodEnum::msecs;
 
+			auto remainder = counted;
 			const auto msecs = remainder % 1000;
 			remainder /= 1000;
 			const auto secs = remainder % 60;
@@ -198,7 +198,7 @@ namespace text_overseer
 			remainder /= 60;
 			const auto hours = remainder % 24;
 			remainder /= 24;
-			const auto days = remainder;
+			const auto days = std::move(remainder);
 
 			// check if the duration is smaller than a base period
 			if ((counted == 0 && base_period == PeriodEnum::msecs)

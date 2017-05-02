@@ -75,6 +75,24 @@ namespace text_overseer
 			answer_box_.refresh_textbox_line_num();
 		}
 
+		WelcomeBox::WelcomeBox(nana::window wd) : panel<true>(wd)
+		{
+			// div
+			place_.div(
+				"<vert "
+				"  <>"
+				"  <lab_welcome>"
+				"  <>"
+				">"
+			);
+			place_["lab_welcome"] << lab_welcome_;
+			place_.collocate();
+
+			// widget initiation - label
+			lab_welcome_.format(true);
+			lab_welcome_.text_align(align::center);
+		}
+
 		MainWindow::MainWindow()
 			: form(API::make_center(640, 400),
 				appear::decorate<appear::sizable, appear::minimize>())
@@ -91,7 +109,7 @@ namespace text_overseer
 				"    <weight=68 pic_logo>"
 				"    <vert "
 				"      <weight=18 margin=[0, 0, 2, 5] lab_title>"
-				"      <margin=[0, 0, 4, 12] lab_welcome>"
+				"      <margin=[0, 0, 4, 12] lab_description>"
 				"    >"
 				"    <weight=150 margin=[0, 0, 0, 3] btn_refresh>"
 				"  >"
@@ -101,7 +119,7 @@ namespace text_overseer
 			);
 			place_["pic_logo"] << pic_logo_;
 			place_["lab_title"] << lab_title_;
-			place_["lab_welcome"] << lab_welcome_;
+			place_["lab_description"] << lab_description_;
 			place_["btn_refresh"] << btn_refresh_;
 			place_["tabbar"] << tabbar_;
 			place_.collocate();
@@ -115,7 +133,7 @@ namespace text_overseer
 
 			// widget initiation - label
 			lab_title_.format(true);
-			lab_welcome_.format(true);
+			lab_description_.format(true);
 
 			// initiation of tap pages
 			tabbar_.toolbox(tabbar<std::string>::kits::scroll, true);
@@ -158,9 +176,9 @@ namespace text_overseer
 				lab_title_.caption(str);
 
 				// change lab_welcome_
-				str = lab_welcome_.caption();
+				str = lab_description_.caption();
 				str.replace(str.find(u8"감시"), sizeof(u8"감시") - 1, u8"<bold color=0x800080>탐지</>");
-				lab_welcome_.caption(str);
+				lab_description_.caption(str);
 
 				// set flag to get this doing once
 				was_called = true;
@@ -206,6 +224,9 @@ namespace text_overseer
 			});
 
 			tabbar_.events().activated([this](const arg_tabbar<std::string>& arg) {
+				std::unique_lock<std::mutex> lock(io_tab_mutex_, std::try_to_lock);
+				if (!lock)
+					return;
 				_make_io_tabs_not_enabled_except_one(arg.widget.activated());
 			});
 
@@ -295,6 +316,8 @@ namespace text_overseer
 
 		void MainWindow::_search_io_files() noexcept
 		{
+			std::lock_guard<std::mutex> g(io_tab_mutex_);
+
 			// preserve the condition of timer_io_tab_state_
 			const auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
 			timer_io_tab_state_.stop();
@@ -365,6 +388,21 @@ namespace text_overseer
 				);
 			}
 
+			if (!io_tab_pages_.empty())
+			{
+				// erase the welcome box
+				place_.erase(welcome_box_);
+				// make io tab pages not enabled except the activated one
+				_make_io_tabs_not_enabled_except_one(tabbar_.activated());
+			}
+			else
+			{
+				// add the welcome box
+				place_["tab_frame"].fasten(welcome_box_);
+				// refresh the tabbar
+				API::refresh_window(tabbar_);
+			}
+
 			// update nana::place
 			place_.collocate();
 
@@ -375,9 +413,6 @@ namespace text_overseer
 			// _make_tabbar_color_animation() for all tabs
 			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
 				_make_tabbar_color_animation(i);
-
-			// make io tab pages not enabled except the activated one
-			_make_io_tabs_not_enabled_except_one(tabbar_.activated());
 		}
 	}
 }

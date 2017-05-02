@@ -27,6 +27,8 @@ namespace text_overseer
 		constexpr int k_max_count_check_last_file_write = 5;
 		constexpr int k_ms_gui_timer_interval = 20;
 		constexpr int k_ms_update_label_state_interval = 100;
+
+		// the postfix for the label when the input file is edited
 		constexpr std::array<char, 24> k_label_postfix_edited{ " <color=0xff4500>(*)</>" };
 
 		const nana::color k_line_num_default_color = nana::colors::light_goldenrod_yellow;
@@ -79,7 +81,7 @@ namespace text_overseer
 		class AnswerTextBoxUnit : public AbstractBoxUnit
 		{
 		public:
-			AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page);
+			explicit AnswerTextBoxUnit(IOFilesTabPage& parent_tab_page);
 
 			void label_caption(const std::string &str) { lab_state_.caption(str); }
 			void label_caption(std::string &&str) { lab_state_.caption(std::move(str)); }
@@ -132,7 +134,7 @@ namespace text_overseer
 		class InputFileBoxUnit : public AbstractIOFileBoxUnit
 		{
 		public:
-			InputFileBoxUnit(IOFilesTabPage& parent_tab_page);
+			explicit InputFileBoxUnit(IOFilesTabPage& parent_tab_page);
 
 			virtual bool read_file() override;
 
@@ -225,6 +227,21 @@ namespace text_overseer
 			AnswerTextBoxUnit answer_box_{ *this };
 		};
 
+		class WelcomeBox : public nana::panel<true>
+		{
+		public:
+			WelcomeBox(nana::window wd);
+
+		private:
+			nana::place place_{ *this };
+			nana::label lab_welcome_{
+				*this,
+				u8"이 프로그램을 처음 이용하고 계신가요? \n\n"
+				u8"현재 폴더 또는 하위 폴더에 있는 <blue>input.txt</>나 <blue>output.txt</>를 찾지 못했습니다. \n"
+				u8"<blue>input.txt</>나 <blue>output.txt</>를 만든 뒤, '<green>입출력 파일 다시 찾기</>'를 해보세요."
+			};
+		};
+
 		class MainWindow : public nana::form
 		{
 		public:
@@ -248,11 +265,12 @@ namespace text_overseer
 
 			nana::place place_{ *this };
 			nana::picture pic_logo_{ *this };
+
 			nana::label lab_title_{
 				*this,
 				u8"<bold>텍스트 입출력 파일 감시기(Text Input/Output File Overseer)</>"
 			};
-			nana::label lab_welcome_{
+			nana::label lab_description_{
 				*this,
 				u8"이 프로그램은 이 프로그램이 위치한 폴더와 하위 폴더에 있는 "
 				u8"<blue>input.txt</>와 <blue>output.txt</>의 변동 여부를 실시간으로 감시합니다.\n"
@@ -261,15 +279,18 @@ namespace text_overseer
 			nana::button btn_refresh_{ *this, u8"입출력 파일 다시 찾기" };
 
 			nana::tabbar<std::string> tabbar_{ *this };
+			std::mutex io_tab_mutex_;
 			std::vector<std::shared_ptr<IOFilesTabPage>> io_tab_pages_;
-
 			nana::timer timer_io_tab_state_;
+
+			WelcomeBox welcome_box_{ *this }; // it will be shown when there's no IO tab page
 
 			struct TabbarColorAnimation
 			{
 				std::shared_ptr<nana::timer> timer_ptr;
 				unsigned int elapsed_time;
 			};
+
 			std::vector<TabbarColorAnimation> tabbar_color_animations_;
 		};
 	}

@@ -187,6 +187,7 @@ namespace text_overseer
 				buf.resize(size); // throws std::length_error if the size is too big
 			}
 
+		private:
 			std::basic_fstream<unsigned char>	file_;
 			std::ios::openmode					file_openmode_;
 			encoding							file_locale_{ encoding::system };

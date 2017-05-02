@@ -15,7 +15,7 @@ public:
 
 	static T& instance()
 	{
-		std::call_once(once_flag_, [] {
+		std::call_once(once_flag_, [&] {
 			instance_ = std::make_unique<T>();
 		});
 		return *instance_.get();

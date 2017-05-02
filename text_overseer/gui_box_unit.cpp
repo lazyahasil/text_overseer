@@ -1,5 +1,7 @@
-﻿// std::copy() for char* in boost library(string.hpp) causes a MS complier error
+﻿// std::copy() for char* in boost library(string.hpp) causes an error by MS compliers
+#ifdef _MSC_VER
 #define _SCL_SECURE_NO_WARNINGS
+#endif
 
 #include "gui.hpp"
 #include "encoding.hpp"
@@ -88,7 +90,7 @@ namespace text_overseer
 
 			textbox_.events().mouse_wheel([this] {
 				this->refresh_textbox_line_num();
-			}); // mouse wheel does effect even when it's not focused
+			}); // mouse wheel does effect(changes its line position) even when it's not focused
 
 			textbox_.events().resized([this] {
 				this->refresh_textbox_line_num();
@@ -579,7 +581,7 @@ namespace text_overseer
 			}
 
 			_reset_textbox_edited();
-			combo_locale_.option(static_cast<std::size_t>(locale)); // event won't happen because of mutex lock
+			combo_locale_.option(static_cast<std::size_t>(locale)); // its event won't happen because of the mutex lock
 			return true;
 		}
 
