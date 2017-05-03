@@ -65,7 +65,7 @@ namespace text_overseer
 
 			nana::place place_{ *this };
 			nana::label lab_name_{ *this };
-			nana::label lab_state_{ *this, u8"상태" };
+			nana::label lab_state_{ *this, u8"<size=8>출력 파일이 있을 때 작동합니다.</>" };
 			nana::panel<true> line_num_{ *this };
 			nana::textbox textbox_{ *this };
 			nana::menu popup_menu_;
@@ -227,10 +227,12 @@ namespace text_overseer
 			AnswerTextBoxUnit answer_box_{ *this };
 		};
 
+		class MainWindow;
+
 		class WelcomeBox : public nana::panel<true>
 		{
 		public:
-			WelcomeBox(nana::window wd);
+			explicit WelcomeBox(MainWindow& parent_main_window);
 
 		private:
 			void _make_examples() noexcept;
@@ -245,6 +247,8 @@ namespace text_overseer
 				u8"또는 아래에 있는 '<bold color=0x800080>예제 파일 만들기</>' 기능을 사용하세요."
 			};
 			nana::button but_make_examples_{ *this, u8"예제 파일 만들기" };
+
+			MainWindow* main_window_ptr_{ nullptr };
 		};
 
 		class MainWindow : public nana::form
@@ -252,7 +256,7 @@ namespace text_overseer
 		public:
 			MainWindow();
 
-			auto& io_tab_pages() noexcept { return io_tab_pages_; }
+			void search_io_files() noexcept;
 
 		private:
 			void _create_io_tab_page(
@@ -266,7 +270,6 @@ namespace text_overseer
 			void _make_timer_io_tab_state() noexcept;
 			void _make_tabbar_color_animation(std::size_t pos) noexcept;
 			void _remove_tabbar_color_animation(std::size_t pos) noexcept;
-			void _search_io_files() noexcept;
 
 			nana::place place_{ *this };
 			nana::picture pic_logo_{ *this };

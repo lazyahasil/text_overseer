@@ -188,8 +188,9 @@ namespace text_overseer
 				buf.resize(size);
 			}
 
-		private:
 			std::basic_fstream<unsigned char>	file_;
+
+		private:
 			std::ios::openmode					file_openmode_;
 			encoding							file_locale_{ encoding::system };
 			std::wstring						filename_;

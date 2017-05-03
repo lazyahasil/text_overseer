@@ -75,7 +75,8 @@ namespace text_overseer
 			answer_box_.refresh_textbox_line_num();
 		}
 
-		WelcomeBox::WelcomeBox(nana::window wd) : panel<true>(wd)
+		WelcomeBox::WelcomeBox(MainWindow& parent_main_window)
+			: panel<true>(parent_main_window), main_window_ptr_(&parent_main_window)
 		{
 			bgcolor(colors::white);
 
@@ -108,14 +109,56 @@ namespace text_overseer
 
 		void WelcomeBox::_make_examples() noexcept
 		{
-			msgbox mb(*this, u8"미구현 기능");
-			mb.icon(msgbox::icon_information) << u8"미구현 기능입니다!";
-			mb.show();
+			file_system::filesys::create_directory(L"example1");
+			file_system::filesys::create_directory(L"example2");
+
+			std::array<FileIO, 4> files{
+				FileIO(L"example1/input.txt"),
+				FileIO(L"example1/output.txt"),
+				FileIO(L"example2/input.txt"),
+				FileIO(L"example2/output.txt")
+			};
+			constexpr std::array<char*, 4> texts{
+				"5\r\n10 20 30 40 50",
+				"50\r\n40\r\n30\r\n20\r\n10\r\n",
+				"(8+2*4)/4",
+				"8 2 4 * + 4 /\r\n4\r\n"
+			};
+			
+			try
+			{
+				for (std::size_t i = 0; i < 4; i++)
+				{
+					try
+					{
+						if (!files[i].open(std::ios::out | std::ios::binary))
+							throw std::runtime_error("Cannot open the file to write");
+						files[i].write_all(texts[i], std::strlen(texts[i]));
+						files[i].close();
+					}
+					catch (std::exception& e)
+					{
+						throw std::runtime_error(
+							std::string(e.what()) + " - " + wstr_to_utf8(files[i].filename_wstring())
+						);
+					}
+				}
+			}
+			catch (std::runtime_error& e)
+			{
+				ErrorHdr::instance().report(
+					ErrorHdr::priority::critical, 0, "Failed to write an example file", e.what()
+				);
+				msgbox mb(*main_window_ptr_, u8"예제 파일 만들기 실패");
+				mb.icon(msgbox::icon_error) << u8"예제 파일을 쓰는 데 실패했습니다.";
+				mb.show();
+			}
+
+			main_window_ptr_->search_io_files();
 		}
 
 		MainWindow::MainWindow()
-			: form(API::make_center(640, 400),
-				appear::decorate<appear::sizable, appear::minimize>())
+			: form(API::make_center(640, 400), appear::decorate<appear::sizable, appear::minimize>())
 		{
 			// set the form's title
 			caption(std::string(u8"Text I/O File Overseer v") + k_version_str);
@@ -158,11 +201,111 @@ namespace text_overseer
 			// initiation of tap pages
 			tabbar_.toolbox(tabbar<std::string>::kits::scroll, true);
 			tabbar_.toolbox(tabbar<std::string>::kits::list, true);
-			_search_io_files();
+			search_io_files();
 
 			// make events and etc.
 			_make_events();
 			_make_timer_io_tab_state();
+		}
+
+		void MainWindow::search_io_files() noexcept
+		{
+			std::lock_guard<std::mutex> g(io_tab_mutex_);
+
+			// preserve the condition of timer_io_tab_state_
+			const auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
+			timer_io_tab_state_.stop();
+
+			// _remove_tabbar_color_animation() for all tabbar_color_animations_
+			for (std::size_t i = 0; i < tabbar_color_animations_.size(); i++)
+				_remove_tabbar_color_animation(i);
+
+			auto pair_file_pairs_and_path_ecs = file_system::search_input_output_files(L"input.txt", L"output.txt");
+			auto file_pairs = std::move(pair_file_pairs_and_path_ecs.first);
+			const auto path_ecs = std::move(pair_file_pairs_and_path_ecs.second);
+
+			// check error codes from file_system::search_input_output_files()
+			for (const auto& path_ec : path_ecs)
+			{
+				const auto ec = path_ec.error_code();
+				ErrorHdr::instance().report(
+					ErrorHdr::priority::info,
+					ec.value(),
+					std::string("Cannot open the path while file search - ")
+					+ charset(ec.message()).to_bytes(unicode::utf8),
+					wstr_to_utf8(path_ec.path_str())
+				);
+			}
+
+			// check if tab pages found already exists
+			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
+			{
+				auto are_already_in_tabs = false;
+
+				for (std::size_t j = 0; j < file_pairs.size(); j++)
+				{
+					if (io_tab_pages_[i]->is_same_files(file_pairs[j].first, file_pairs[j].second))
+					{
+						are_already_in_tabs = true;
+						file_pairs.erase(file_pairs.begin() + j);
+						break;
+					}
+				}
+
+				if (are_already_in_tabs)
+				{
+					io_tab_pages_[i]->reload_files();
+				}
+				else
+				{
+					tabbar_.erase(i); // it will change current activated tab; but can't manage to handle this
+					place_.erase(*io_tab_pages_[i]);
+					io_tab_pages_.erase(io_tab_pages_.begin() + i--);
+				}
+			}
+
+			// get the folder names and _create_io_tab_page()
+			for (auto& file_pair : file_pairs)
+			{
+				const auto before_last_slash = file_pair.first.find_last_of(L"/\\") - 1;
+				const auto after_second_last_slash = file_pair.first.find_last_of(L"/\\", before_last_slash) + 1;
+				auto folder_wstr = file_pair.first.substr(
+					after_second_last_slash,
+					before_last_slash - after_second_last_slash + 1
+				);
+				if (folder_wstr.empty())
+					folder_wstr = L"root";
+				_create_io_tab_page(
+					charset(std::move(folder_wstr)).to_bytes(unicode::utf8),
+					std::move(file_pair.first),
+					std::move(file_pair.second)
+				);
+			}
+
+			if (!io_tab_pages_.empty())
+			{
+				place_.erase(welcome_box_); // erase the welcome box
+				welcome_box_.hide();
+				// make io tab pages not enabled except the activated one
+				_make_io_tabs_not_enabled_except_one(tabbar_.activated());
+			}
+			else
+			{
+				place_["tab_frame"].fasten(welcome_box_); // add the welcome box
+				welcome_box_.show();
+				API::refresh_window(tabbar_); // refresh the tabbar
+			}
+
+			// update nana::place
+			place_.collocate();
+
+			// restore the condition of timer_io_tab_state_
+			if (timer_io_tab_state_was_going)
+				timer_io_tab_state_.start();
+
+			// _make_tabbar_color_animation() for all tabs
+			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
+				_make_tabbar_color_animation(i);
 		}
 
 		void MainWindow::_create_io_tab_page(
@@ -240,7 +383,7 @@ namespace text_overseer
 
 			// btn_refresh_ is clicked => _search_io_files()
 			btn_refresh_.events().click([this](const arg_click&) {
-				this->_search_io_files();
+				this->search_io_files();
 				// show a message box if empty
 				if (io_tab_pages_.empty())
 				{
@@ -292,10 +435,10 @@ namespace text_overseer
 		void MainWindow::_make_timer_io_tab_state() noexcept
 		{
 			timer_io_tab_state_.elapse([this] {
-				const auto size = io_tab_pages().size();
+				const auto size = this->io_tab_pages_.size();
 				for (std::size_t i = 0; i < size; i++)
 				{
-					if (io_tab_pages()[i]->update_io_file_box_state())
+					if (this->io_tab_pages_[i]->update_io_file_box_state())
 						this->_make_tabbar_color_animation(i);
 				}
 			});
@@ -322,7 +465,7 @@ namespace text_overseer
 			a_timer->elapse([this, pos, interval = a_timer->interval(), &func_color_level](const nana::arg_elapse&) {
 				auto& time = this->tabbar_color_animations_[pos].elapsed_time;
 				color color_leveled(color_rgb(0xff8c00)); // #ff8c00 dark orange
-				color_leveled = color_leveled.blend(colors::white, func_color_level(time));
+				color_leveled = color_leveled.blend(colors::button_face, func_color_level(time));
 				this->tabbar_.tab_bgcolor(pos, color_leveled);
 				time += interval;
 				if (time >= 1600)
@@ -342,107 +485,6 @@ namespace text_overseer
 				return;
 			timer_data.timer_ptr->stop();
 			timer_data.timer_ptr.reset();
-		}
-
-		void MainWindow::_search_io_files() noexcept
-		{
-			std::lock_guard<std::mutex> g(io_tab_mutex_);
-
-			// preserve the condition of timer_io_tab_state_
-			const auto timer_io_tab_state_was_going = timer_io_tab_state_.started();
-			timer_io_tab_state_.stop();
-
-			// _remove_tabbar_color_animation() for all tabbar_color_animations_
-			for (std::size_t i = 0; i < tabbar_color_animations_.size(); i++)
-				_remove_tabbar_color_animation(i);
-
-			auto pair_file_pairs_and_path_ecs = file_system::search_input_output_files(L"input.txt", L"output.txt");
-			auto file_pairs = std::move(pair_file_pairs_and_path_ecs.first);
-			const auto path_ecs = std::move(pair_file_pairs_and_path_ecs.second);
-
-			// check error codes from file_system::search_input_output_files()
-			for (const auto& path_ec : path_ecs)
-			{
-				const auto ec = path_ec.error_code();
-				ErrorHdr::instance().report(
-					ErrorHdr::priority::info,
-					ec.value(),
-					std::string("Cannot open the path while file search - ")
-					+ charset(ec.message()).to_bytes(unicode::utf8),
-					wstr_to_utf8(path_ec.path_str())
-				);
-			}
-
-			// check if tab pages found already exists
-			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
-			{
-				auto are_already_in_tabs = false;
-
-				for (std::size_t j = 0; j < file_pairs.size(); j++)
-				{
-					if (io_tab_pages_[i]->is_same_files(file_pairs[j].first, file_pairs[j].second))
-					{
-						are_already_in_tabs = true;
-						file_pairs.erase(file_pairs.begin() + j);
-						break;
-					}
-				}
-
-				if (are_already_in_tabs)
-				{
-					io_tab_pages_[i]->reload_files();
-				}
-				else
-				{
-					tabbar_.erase(i); // it will change current activated tab; but can't manage to handle this
-					place_.erase(*io_tab_pages_[i]);
-					io_tab_pages_.erase(io_tab_pages_.begin() + i--);
-				}
-			}
-
-			// get the folder names and _create_io_tab_page()
-			for (auto& file_pair : file_pairs)
-			{
-				const auto before_last_slash = file_pair.first.find_last_of(L"/\\") - 1;
-				const auto after_second_last_slash = file_pair.first.find_last_of(L"/\\", before_last_slash) + 1;
-				auto folder_wstr = file_pair.first.substr(
-					after_second_last_slash,
-					before_last_slash - after_second_last_slash + 1
-				);
-				if (folder_wstr.empty())
-					folder_wstr = L"root";
-				_create_io_tab_page(
-					charset(std::move(folder_wstr)).to_bytes(unicode::utf8),
-					std::move(file_pair.first),
-					std::move(file_pair.second)
-				);
-			}
-
-			if (!io_tab_pages_.empty())
-			{
-				// erase the welcome box
-				place_.erase(welcome_box_);
-				// make io tab pages not enabled except the activated one
-				_make_io_tabs_not_enabled_except_one(tabbar_.activated());
-			}
-			else
-			{
-				// add the welcome box
-				place_["tab_frame"].fasten(welcome_box_);
-				// refresh the tabbar
-				API::refresh_window(tabbar_);
-			}
-
-			// update nana::place
-			place_.collocate();
-
-			// restore the condition of timer_io_tab_state_
-			if (timer_io_tab_state_was_going)
-				timer_io_tab_state_.start();
-
-			// _make_tabbar_color_animation() for all tabs
-			for (std::size_t i = 0; i < io_tab_pages_.size(); i++)
-				_make_tabbar_color_animation(i);
 		}
 	}
 }
