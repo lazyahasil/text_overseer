@@ -181,10 +181,11 @@ namespace text_overseer
 			bool FileIO::_read_file_check();
 			bool FileIO::_write_file_check();
 
+			// @throws std::length_error if the file size is too big
 			template <class ResizableStringBuffer>
 			void _resize_buf(ResizableStringBuffer& buf, std::size_t size)
 			{
-				buf.resize(size); // throws std::length_error if the size is too big
+				buf.resize(size);
 			}
 
 		private:
@@ -206,6 +207,8 @@ namespace text_overseer
 			FileIOClosingGuard(const FileIOClosingGuard& src) = delete;
 			FileIOClosingGuard& operator=(const FileIOClosingGuard& rhs) = delete;
 
+			// named close_safe() to avoid using FileIO::close() by mistake
+			// (but it's safe to use FileIO::close(); it is just a better design)
 			void close_safe() noexcept
 			{
 				// no need for check because std::basic_fstream<>::close() does check if closed

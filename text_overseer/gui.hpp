@@ -233,13 +233,18 @@ namespace text_overseer
 			WelcomeBox(nana::window wd);
 
 		private:
+			void _make_examples() noexcept;
+
 			nana::place place_{ *this };
 			nana::label lab_welcome_{
 				*this,
-				u8"이 프로그램을 처음 이용하고 계신가요? \n\n"
-				u8"현재 폴더 또는 하위 폴더에 있는 <blue>input.txt</>나 <blue>output.txt</>를 찾지 못했습니다. \n"
-				u8"<blue>input.txt</>나 <blue>output.txt</>를 만든 뒤, '<green>입출력 파일 다시 찾기</>'를 해보세요."
+				u8"<bold size=11>이 프로그램을 처음 이용하고 계신가요?</> \n\n"
+				u8"현재 폴더 또는 하위 폴더에 있는 <blue>input.txt</>나 <blue>output.txt</>를 찾지 못했습니다.\n"
+				u8"<blue>input.txt</>나 <blue>output.txt</>를 만든 뒤, "
+				u8"위쪽에 있는 '<bold green>입출력 파일 다시 찾기</>'를 눌러보세요.\n"
+				u8"또는 아래에 있는 '<bold color=0x800080>예제 파일 만들기</>' 기능을 사용하세요."
 			};
+			nana::button but_make_examples_{ *this, u8"예제 파일 만들기" };
 		};
 
 		class MainWindow : public nana::form

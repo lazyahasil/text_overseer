@@ -77,20 +77,40 @@ namespace text_overseer
 
 		WelcomeBox::WelcomeBox(nana::window wd) : panel<true>(wd)
 		{
+			bgcolor(colors::white);
+
 			// div
 			place_.div(
 				"<vert "
 				"  <>"
-				"  <lab_welcome>"
+				"  <weight=100 lab_welcome>"
+				"  <weight=40"
+				"    <> <weight=160 but_make_examples> <>"
+				"  >"
 				"  <>"
 				">"
 			);
 			place_["lab_welcome"] << lab_welcome_;
+			place_["but_make_examples"] << but_make_examples_;
 			place_.collocate();
 
-			// widget initiation - label
+			// widget initiation
 			lab_welcome_.format(true);
 			lab_welcome_.text_align(align::center);
+			lab_welcome_.bgcolor(colors::white);
+			but_make_examples_.bgcolor(colors::alice_blue);
+
+			// make events
+			but_make_examples_.events().click([this](const arg_click&) {
+				this->_make_examples();
+			});
+		}
+
+		void WelcomeBox::_make_examples() noexcept
+		{
+			msgbox mb(*this, u8"미구현 기능");
+			mb.icon(msgbox::icon_information) << u8"미구현 기능입니다!";
+			mb.show();
 		}
 
 		MainWindow::MainWindow()
@@ -221,6 +241,13 @@ namespace text_overseer
 			// btn_refresh_ is clicked => _search_io_files()
 			btn_refresh_.events().click([this](const arg_click&) {
 				this->_search_io_files();
+				// show a message box if empty
+				if (io_tab_pages_.empty())
+				{
+					msgbox mb(*this, u8"검색 결과 없음");
+					mb.icon(msgbox::icon_information) << u8"input.txt나 output.txt 파일을 찾지 못했습니다.";
+					mb.show();
+				}
 			});
 
 			tabbar_.events().activated([this](const arg_tabbar<std::string>& arg) {
@@ -237,8 +264,11 @@ namespace text_overseer
 				mb << u8"정말로 종료하시겠습니까?";
 				if (arg.cancel = (mb() == msgbox::pick_no))
 					return;
-				mb << u8"\n저장하지 않은 정보는 손실될 수 있습니다!\n\n종료하려면 '예'를 누르세요.";
-				arg.cancel = (mb() == msgbox::pick_no);
+				if (!io_tab_pages_.empty())
+				{
+					mb << u8"\n저장하지 않은 정보는 손실될 수 있습니다!\n\n종료하려면 '예'를 누르세요.";
+					arg.cancel = (mb() == msgbox::pick_no);
+				}
 			});
 		}
 
