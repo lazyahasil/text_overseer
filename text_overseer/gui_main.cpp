@@ -24,13 +24,11 @@ namespace text_overseer
 		{
 			place_.div(
 				"<"
-				"  <weight=5>"
-				"  <"
+				"  <margin=[7, 5, 3, 5] "
 				"    <weight=36% input_box>"
 				"    | <weight=36% output_box>"
 				"    | <answer_box>"
 				"  >"
-				"  <weight=5>"
 				">"
 			);
 			place_["input_box"] << input_box_;
@@ -119,8 +117,8 @@ namespace text_overseer
 				FileIO(L"example2/output.txt")
 			};
 			constexpr std::array<char*, 4> texts{
-				"5\r\n10 20 30 40 50",
-				"50\r\n40\r\n30\r\n20\r\n10\r\n",
+				"5\r\n1 2 3 4 5",
+				"5\r\n5 4\r\n5 4 3\r\n5 4 3 2\r\n5 4 3 2 1\r\n",
 				"(8+2*4)/4",
 				"8 2 4 * + 4 /\r\n4\r\n"
 			};
@@ -177,7 +175,7 @@ namespace text_overseer
 				"    <weight=150 margin=[0, 0, 0, 3] btn_refresh>"
 				"  >"
 				"  <weight=25 tabbar>"
-				"  <margin=[5, 0, 3, 0] tab_frame>"
+				"  <tab_frame>"
 				">"
 			);
 			place_["pic_logo"] << pic_logo_;

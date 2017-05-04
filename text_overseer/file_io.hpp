@@ -36,6 +36,7 @@ namespace text_overseer
 
 		// a class that supports text file reading & writing;
 		// it also can handle the system encoding and unicode, and can take care of BOM(Byte Order Mark)
+		// its I/O functions(read/write all/some) have checking processes assuming them occasionally called
 		class FileIO
 		{
 		public:

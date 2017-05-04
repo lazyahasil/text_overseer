@@ -39,7 +39,6 @@ namespace text_overseer
 		{
 		public:
 			AbstractBoxUnit(IOFilesTabPage& parent_tab_page);
-			virtual ~AbstractBoxUnit() = default;
 
 			void refresh_textbox_line_num() noexcept
 			{
@@ -65,7 +64,7 @@ namespace text_overseer
 
 			nana::place place_{ *this };
 			nana::label lab_name_{ *this };
-			nana::label lab_state_{ *this, u8"<size=8>출력 파일이 있을 때 작동합니다.</>" };
+			nana::label lab_state_{ *this };
 			nana::panel<true> line_num_{ *this };
 			nana::textbox textbox_{ *this };
 			nana::menu popup_menu_;
@@ -102,7 +101,6 @@ namespace text_overseer
 		{
 		public:
 			AbstractIOFileBoxUnit(IOFilesTabPage& parent_tab_page);
-			virtual ~AbstractIOFileBoxUnit() = default;
 
 			virtual bool read_file();
 			virtual bool update_label_state() noexcept override;
