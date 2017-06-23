@@ -50,14 +50,12 @@ namespace text_overseer
 			};
 
 			FileIO() = default;
-			FileIO(
-				const std::wstring& filename,
-				encoding file_locale = encoding::system
-			) : filename_(filename), file_locale_(file_locale) { }
-			FileIO(
-				std::wstring&& filename,
-				encoding file_locale = encoding::system
-			) : filename_(std::move(filename)), file_locale_(file_locale) { }
+			FileIO(const std::wstring& filename) : filename_(filename) { }
+			FileIO(std::wstring&& filename) : filename_(std::move(filename)) { }
+			FileIO(const std::wstring& filename, encoding file_locale)
+				: filename_(filename), file_locale_(file_locale) { }
+			FileIO(std::wstring&& filename, encoding file_locale)
+				: filename_(std::move(filename)), file_locale_(file_locale) { }
 
 			bool open(std::ios::openmode mode); // needs std::ios::binary
 			bool is_open() noexcept { return file_.is_open(); }

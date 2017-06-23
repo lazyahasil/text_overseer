@@ -138,7 +138,7 @@ namespace text_overseer
 			template <class StringT>
 			struct TimePeriodStringsT
 			{
-				// Most of strings, which mean a period, have blanks at both sides
+				// Most of strings, which mean each periods, have blanks at both sides
 				StringT just_a_moment; // has a blank at back only
 				StringT msecs_singular;
 				StringT msecs_plural;

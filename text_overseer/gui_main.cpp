@@ -52,7 +52,7 @@ namespace text_overseer
 				);
 				answer_box_.reset_line_count_of_file();
 				return;
-			case static_cast<int>(OutputFileBoxUnit::line_diff_sign::done) :
+			case static_cast<int>(OutputFileBoxUnit::line_diff_sign::done):
 				oss << u8"<green>비교가 끝났습니다.</>\n";
 				answer_box_.reset_line_count_of_file();
 				break;
