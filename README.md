@@ -1,3 +1,9 @@
+# This is discontinued
+
+Check out DSCV: https://github.com/lazyahasil/dscv
+
+---
+
 # 텍스트 입출력 파일 감시기(Text I/O File Overseer)
 ## 다운로드(Downloads)
 <https://github.com/lazyahasil/text_overseer/releases>
